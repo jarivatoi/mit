@@ -243,7 +243,7 @@ export const MenuPanel: React.FC<MenuPanelProps> = ({
           <div className="space-y-3 text-sm text-indigo-700">
             <div className="text-center">
               <p><strong>Export Format:</strong> JSON (.json)</p>
-              <p><strong>File Name:</strong> Roster_dd-mm-yyyy.json</p>
+              <p><strong>File Name:</strong> User_dd-mm-yyyy_HH-MM.json</p>
               <p><strong>Current Version:</strong> 3.0 (IndexedDB powered)</p>
             </div>
             
