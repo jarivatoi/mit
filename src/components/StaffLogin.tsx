@@ -51,6 +51,38 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     return navigator.onLine
   }
 
+  // Monitor online/offline status and clear error when back online
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('🌐 User is back online');
+      // Clear any offline-related errors
+      setError((prevError) => {
+        if (prevError && prevError.includes('offline')) {
+          return null;
+        }
+        return prevError;
+      });
+    };
+
+    const handleOffline = () => {
+      console.log('📡 User went offline');
+      // Don't set error here, just log it - error will be set on next login attempt
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check
+    if (!navigator.onLine && error?.includes('offline')) {
+      setError(null);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [error]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
