@@ -88,7 +88,7 @@ const StaffOnboard: React.FC<{ onComplete?: (u: OnboardResult) => void; onBack?:
         <input placeholder="Re-enter ID Number (verification)" value={confirmIdNumber} onChange={e => setConfirmIdNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14))} style={inputStyle} autoCapitalize="characters" maxLength={14} />
         <input placeholder="4-digit Passcode" value={passcode} onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} style={inputStyle} inputMode="numeric" maxLength={4} />
         {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
-        <button type="submit" style={btn}>Create Staff</button>
+        <button type="submit" style={btn}>Register</button>
         {onBack && (
           <button type="button" onClick={onBack} style={{ ...btn, background: '#6b7280' }}>Back to Login</button>
         )}
