@@ -27,17 +27,10 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
     return navigator.onLine
   }
 
-  // Monitor online/offline status and clear error when back online
+  // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
       console.log('🌐 Profile: User is back online');
-      // Clear any offline-related errors
-      setError((prevError) => {
-        if (prevError && prevError.includes('offline')) {
-          return null;
-        }
-        return prevError;
-      });
     };
 
     const handleOffline = () => {
@@ -47,16 +40,11 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initial check
-    if (!navigator.onLine && error?.includes('offline')) {
-      setError(null);
-    }
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [error]);
+  }, []);
 
   useEffect(() => {
     const fetchMe = async () => {
