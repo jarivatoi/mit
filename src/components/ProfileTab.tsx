@@ -1,50 +1,26 @@
-import React, { useState, useEffect } from 'react' 
-import { supabase, supabaseAdmin } from '../lib/supabase'
-import { saveLastUsedIdNumber, getLastUsedIdNumber } from '../utils/indexedDB';
+import React, { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import AdminPanel from './AdminPanel'
+import ConfirmationModal from './ConfirmationModal'
 
-type StaffLoginProps = {
-  onLoginSuccess: (session: { userId: string; idNumber: string; isAdmin: boolean; surname?: string; name?: string }) => void
-  onRegister?: () => void
-  showIdField?: boolean
+type ProfileProps = {
+  user: { id: string; idNumber: string; surname: string; name: string; isAdmin: boolean } | null
+  onLoginSuccess: (session: { userId: string; idNumber: string; isAdmin: boolean }) => void
 }
 
-const hash = async (input: string) => {
-  const enc = new TextEncoder()
-  const data = enc.encode(input)
-  const d = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, showIdField = true }) => {
-  // Try to get the last used ID number from IndexedDB to pre-fill
-  const [idNumber, setIdNumber] = useState('');
-  
-  useEffect(() => {
-    const loadLastId = async () => {
-      try {
-        const lastId = await getLastUsedIdNumber();
-        if (lastId) {
-          setIdNumber(lastId);
-        }
-      } catch (error) {
-        console.warn('Could not load last used ID number from IndexedDB, falling back to localStorage:', error);
-        // Fallback to localStorage if IndexedDB fails
-        const fallbackId = localStorage.getItem('last_used_id_number');
-        if (fallbackId) {
-          setIdNumber(fallbackId);
-        }
-      }
-    };
-    
-    loadLastId();
-  }, []);
+const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
+  const [surname, setSurname] = useState('')
+  const [name, setName] = useState('')
+  const [idNumber, setIdNumber] = useState('')
+  const [showLogin, setShowLogin] = useState(false)
   const [passcode, setPasscode] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [showForgotPasscode, setShowForgotPasscode] = useState(false)
+  const [forgotPasscode, setForgotPasscode] = useState(false)
   const [tempIdNumber, setTempIdNumber] = useState('')
-  const [idVerified, setIdVerified] = useState(false) // New state to track ID verification
   const [newPasscode, setNewPasscode] = useState('')
   const [confirmPasscode, setConfirmPasscode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // Check if user is online
   const checkOnlineStatus = (): boolean => {
@@ -54,7 +30,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
   // Monitor online/offline status and clear error when back online
   useEffect(() => {
     const handleOnline = () => {
-      console.log('🌐 User is back online');
+      console.log('🌐 Profile: User is back online');
       // Clear any offline-related errors
       setError((prevError) => {
         if (prevError && prevError.includes('offline')) {
@@ -65,8 +41,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     };
 
     const handleOffline = () => {
-      console.log('📡 User went offline');
-      // Don't set error here, just log it - error will be set on next login attempt
+      console.log('📡 Profile: User went offline');
     };
 
     window.addEventListener('online', handleOnline);
@@ -83,9 +58,21 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     };
   }, [error]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+  useEffect(() => {
+    const fetchMe = async () => {
+      if (!user?.id) return
+      const { data, error } = await supabase.from('staff_users').select('*').eq('id', user.id).single()
+      if (!error && data) {
+        setSurname(data.surname || '')
+        setName(data.name || '')
+        setIdNumber(data.id_number || '')
+      }
+    }
+    fetchMe()
+  }, [user?.id])
+
+  const save = async () => {
+    if (!user?.id) return
     
     // Check if user is online
     if (!checkOnlineStatus()) {
@@ -93,77 +80,100 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
       return
     }
     
-    // Determine the ID number to use
-    const actualIdNumber = showIdField ? idNumber : (passcode === '5274' ? '5274' : idNumber)
-    
-    // Validate that both ID Number and Passcode are provided
-    if (!actualIdNumber || !passcode) {
-      setError('Enter a Valid ID Number and Passcode')
+    setShowSaveModal(true)
+  }
+
+  const handleSaveConfirm = async () => {
+    if (!user?.id) {
+      setError('User not authenticated')
+      setShowSaveModal(false)
       return
     }
     
-    // MVP admin bypass - if passcode is '5274', treat as admin regardless of ID field visibility
-    if (passcode === '5274' && actualIdNumber === '5274') {
-      const session = { userId: 'admin-5274', idNumber: '5274', isAdmin: true };
-      onLoginSuccess(session);
-      return
-    }
-    
-    // Check the global login setting FIRST using admin client (before checking user)
-    let loginEnabled = true; // Default to enabled if setting doesn't exist
     try {
-      const { data: settings, error: settingsError } = await supabaseAdmin.from('system_settings').select('value').eq('key', 'login_enabled').single()
-      
-      if (!settingsError && settings?.value !== undefined && settings?.value !== null) {
-        // Handle both string and boolean values from database
-        loginEnabled = typeof settings.value === 'string' 
-          ? settings.value.toLowerCase() === 'true'
-          : Boolean(settings.value);
-      }
-    } catch {
-      // If settings don't exist, default to enabled
-      // This handles cases where the system_settings table doesn't have the login_enabled key yet
+      // Only update surname and name, not id_number
+      await supabase.from('staff_users').update({ surname, name, updated_at: new Date().toISOString() }).eq('id', user.id)
+      setError('Profile saved successfully')
+      setShowSaveModal(false)
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      setError('Failed to save profile')
+      setShowSaveModal(false)
+    }
+  }
+
+  const changePasscode = async () => {
+    if (!user?.id) {
+      setError('User not authenticated');
+      return;
     }
     
-    // If login is disabled, show error immediately
-    if (!loginEnabled) {
-      setError('Login is currently disabled by admin')
+    // Check if user is online
+    if (!checkOnlineStatus()) {
+      setError('You are currently offline, please check your connectivity and try again...')
       return
     }
     
-    // Regular staff login flow
+    setForgotPasscode(true)
+    setTempIdNumber(idNumber) // Pre-fill with current ID
+    setPasscode('') // Clear the passcode field when changing passcode
+    setError(null) // Clear any previous errors
+  }
+
+  const deleteProfile = async () => {
+    if (!user?.id) return
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!user?.id) {
+      setError('User not authenticated')
+      setShowDeleteModal(false)
+      return
+    }
+    
     try {
-      // First, check if the user exists
-      const rec = await (await import('../lib/supabase')).supabase.from('staff_users').select('id, surname, name, id_number, passcode_hash, is_admin, is_active').eq('id_number', actualIdNumber).single()
-      console.log('User lookup result:', rec);
-      
-      // Check for duplicate ID numbers
-      const duplicates = await (await import('../lib/supabase')).supabase.from('staff_users').select('id, id_number, passcode_hash').eq('id_number', actualIdNumber);
-      console.log('Duplicate check for ID', actualIdNumber, ':', duplicates);
-      
+      await supabase.from('staff_users').delete().eq('id', user.id)
+      localStorage.removeItem('staff_session')
+      localStorage.removeItem('staff_onboarded')
+      localStorage.removeItem('staff_first_run_complete')
+      localStorage.removeItem('staff_needs_login')
+      localStorage.removeItem('last_used_id_number')
+      window.location.reload()
+    } catch (error) {
+      console.error('Error deleting profile:', error)
+      setError('Failed to delete profile')
+      setShowDeleteModal(false)
+    }
+  }
+
+  const hash = async (input: string) => {
+    const enc = new TextEncoder()
+    const data = enc.encode(input)
+    const d = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    
+    // Validate that idNumber exists
+    if (!idNumber) {
+      setError('No ID number found. Please go back and verify your profile.');
+      return;
+    }
+    
+    try {
+      // For profile login, check if user exists and bypass global login setting
+      const rec = await supabase.from('staff_users').select('id, surname, name, id_number, passcode_hash, is_admin, is_active').eq('id_number', idNumber).single()
       if (rec.error || !rec.data) throw new Error('User not found')
       const row = rec.data
       if (!row.is_active) throw new Error('User is inactive')
-      
       const hashed = await hash(passcode)
-      console.log('Login attempt:', { passcode, hashed, storedHash: row.passcode_hash });
       if (hashed !== row.passcode_hash) throw new Error('Incorrect passcode')
-      await (await import('../lib/supabase')).supabase.from('staff_users').update({ last_login: new Date().toISOString() }).eq('id', row.id)
-      // Store the ID number in IndexedDB for future logins
-      try {
-        await saveLastUsedIdNumber(row.id_number);
-      } catch (error) {
-        console.warn('Could not save ID number to IndexedDB, falling back to localStorage:', error);
-        // Fallback to localStorage if IndexedDB fails
-        localStorage.setItem('last_used_id_number', row.id_number);
-      }
-      onLoginSuccess({ 
-        userId: row.id, 
-        idNumber: row.id_number, 
-        isAdmin: !!row.is_admin,
-        surname: row.surname || '',
-        name: row.name || ''
-      })
+      await supabase.from('staff_users').update({ last_login: new Date().toISOString() }).eq('id', row.id)
+      onLoginSuccess({ userId: row.id, idNumber: row.id_number, isAdmin: !!row.is_admin })
     } catch (err: any) {
       setError(err?.message ?? 'Login failed')
     }
@@ -171,40 +181,17 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
 
   const handleForgotPasscode = async () => {
     setError(null)
-    setPasscode('') // Clear the passcode field when starting forgot passcode flow
-    console.log('Starting forgot passcode flow with tempIdNumber:', tempIdNumber);
-    
-    // Check if user is online
-    if (!checkOnlineStatus()) {
-      setError('You are currently offline, please check your connectivity and try again...')
-      return
-    }
-    
-    // Validate ID Number field
-    if (!tempIdNumber || tempIdNumber.trim().length === 0) {
-      setError('Enter a valid ID')
-      return
-    }
-    
-    // Check if ID is exactly 14 alphanumeric characters
-    if (!/^[A-Z0-9]{14}$/.test(tempIdNumber)) {
-      setError('Enter a valid ID')
-      return
-    }
-    
     try {
       const { data, error } = await supabase.from('staff_users').select('id').eq('id_number', tempIdNumber).single()
-      console.log('ID verification result:', { data, error, tempIdNumber });
       if (error || !data) {
-        setError('Incorrect ID Number')
+        setError('Incorrect ID Number, Contact Developer')
         return
       }
       
       // ID verified, now allow setting new passcode
-      setIdVerified(true) // Set verification state
-      setError(null)
+      setForgotPasscode(true)
     } catch (err) {
-      setError('Incorrect ID Number')
+      setError('Incorrect ID Number, Contact Developer')
     }
   }
 
@@ -226,38 +213,65 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     }
     
     try {
-      const hashedPasscode = await hash(newPasscode)
-      console.log('Updating password:', { newPasscode, hashedPasscode, tempIdNumber });
-      console.log('Update query will target id_number:', tempIdNumber);
-      if (!tempIdNumber) {
-        setError('ID number not found');
+      if (!user?.id) {
+        setError('User not authenticated');
         return;
       }
-      const { error } = await supabase.from('staff_users').update({ passcode_hash: hashedPasscode }).eq('id_number', tempIdNumber)
+      const hashedPasscode = await hash(newPasscode)
+      console.log('Profile updating password:', { newPasscode, hashedPasscode, userId: user.id });
+      const updateResult = await supabase.from('staff_users').update({ passcode_hash: hashedPasscode }).eq('id', user.id);
+      console.log('Update operation result:', updateResult);
       
-      if (error) {
-        console.error('Update error:', error);
-        throw error;
+      if (updateResult.error) {
+        console.error('Profile update error:', updateResult.error);
+        throw updateResult.error;
       }
       
       // Verify the update actually happened
-      const verify = await supabase.from('staff_users').select('passcode_hash').eq('id_number', tempIdNumber).single();
-      console.log('Verification after update:', { expected: hashedPasscode, actual: verify.data?.passcode_hash, match: hashedPasscode === verify.data?.passcode_hash });
+      const verify = await supabase.from('staff_users').select('passcode_hash').eq('id', user.id).single();
+      console.log('Profile verification after update:', { 
+        expected: hashedPasscode, 
+        actual: verify.data?.passcode_hash, 
+        match: hashedPasscode === verify.data?.passcode_hash,
+        userId: user.id
+      });
+      
+      // Also check if we can read the record directly
+      const directCheck = await supabase.from('staff_users').select('id, passcode_hash').eq('id', user.id).single();
+      console.log('Direct record check:', directCheck);
       
       setError('Passcode updated successfully')
-      setShowForgotPasscode(false)
+      setForgotPasscode(false)
       setNewPasscode('')
       setConfirmPasscode('')
       setTempIdNumber('')
-      setIdVerified(false) // Reset verification state
       setPasscode('') // Clear the main passcode field
     } catch (err: any) {
       setError(err?.message ?? 'Failed to update passcode')
     }
   }
 
-  if (showForgotPasscode) {
-    if (!idVerified) {
+  if (!user) return <div style={{ padding: 16 }}>Sign in to view profile</div>
+
+  const isAdmin = !!user.isAdmin
+
+  if (showLogin) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
+          <h2 style={{ textAlign: 'center' }}>Enter Passcode</h2>
+          <input placeholder="4-digit Passcode" value={passcode} onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} style={inputStyle} inputMode="numeric" maxLength={4} autoFocus />
+          {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
+          <button type="submit" style={buttonStyle}>Login</button>
+          <button type="button" onClick={() => {setShowLogin(false); setForgotPasscode(false);}} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
+          <button type="button" onClick={() => {setShowLogin(false); setForgotPasscode(true); setTempIdNumber('')}} style={{ ...buttonStyle, background: '#ef4444' }}>Forgot Passcode</button>
+        </form>
+      </div>
+    )
+  }
+
+  if (forgotPasscode && !showLogin) {
+    if (!tempIdNumber) {
       return (
         <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
@@ -265,31 +279,17 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
             <input 
               placeholder="Enter ID Number" 
               value={tempIdNumber} 
-              onChange={e => {
-                const value = e.target.value.toUpperCase();
-                setTempIdNumber(value);
-                // Clear error if we have a valid 14-character alphanumeric ID
-                if (/^[A-Z0-9]{14}$/.test(value)) {
-                  setError(null);
-                }
-              }} 
+              onChange={e => setTempIdNumber(e.target.value)} 
               style={inputStyle} 
-              autoCapitalize="characters"
-              onKeyDown={e => {
-                // Prevent Enter key from submitting the form
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleForgotPasscode();
-                }
-              }}
             />
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
             <button onClick={handleForgotPasscode} style={buttonStyle}>Verify ID</button>
-            <button type="button" onClick={() => {setShowForgotPasscode(false); setTempIdNumber(''); setIdVerified(false); setError(null); setPasscode('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
+            <button type="button" onClick={() => {setForgotPasscode(false); setTempIdNumber('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
           </div>
         </div>
       )
-    } else if (idVerified) {
+    } else if (forgotPasscode && tempIdNumber && !error) {
+      // Only show update passcode screen after successful ID verification
       return (
         <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
@@ -312,7 +312,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
             />
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
             <button onClick={handleUpdatePasscode} style={buttonStyle}>Update Passcode</button>
-            <button type="button" onClick={() => {setShowForgotPasscode(false); setNewPasscode(''); setConfirmPasscode(''); setTempIdNumber(''); setIdVerified(false); setError(null); setPasscode('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Cancel</button>
+            <button type="button" onClick={() => {setForgotPasscode(false); setNewPasscode(''); setConfirmPasscode(''); setTempIdNumber('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Cancel</button>
           </div>
         </div>
       )
@@ -320,36 +320,49 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
-      <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
-        <h2 style={{ textAlign: 'center' }}>Staff Sign In</h2>
-        {showIdField !== false && (
-          <input 
-            placeholder="ID Number" 
-            value={idNumber} 
-            onChange={e => setIdNumber(e.target.value.toUpperCase())} 
-            style={inputStyle} 
-            autoCapitalize="characters"
-            onKeyDown={e => {
-              // Prevent Enter key from submitting the form
-              if (e.key === 'Enter') {
-                e.preventDefault();
-              }
-            }}
+    <div style={{ padding: 16 }}>
+      {isAdmin ? (
+        // Admin users only see Admin Panel
+        <>
+          <h3 style={{ marginBottom: 12 }}>Admin Panel</h3>
+          <AdminPanel />
+        </>
+      ) : (
+        // Regular users see profile form
+        <>
+          <h3 style={{ marginBottom: 12 }}>Profile</h3>
+          <div style={{ display: 'grid', gap: 12, maxWidth: 480 }}>
+            <input value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" style={inputStyle} />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" style={inputStyle} />
+            <input value={idNumber} readOnly placeholder="ID Number" style={{ ...inputStyle, backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
+            <button onClick={save} style={buttonStyle}>Save Profile</button>
+            <button onClick={changePasscode} style={{ ...buttonStyle, background: '#f59e0b', marginTop: 12 }}>Change Passcode</button>
+            <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
+          </div>
+          {error && <div style={{ color: 'red', marginTop: 12, textAlign: 'center' }}>{error}</div>}
+          
+          {/* Save Confirmation Modal */}
+          <ConfirmationModal
+            isOpen={showSaveModal}
+            title="Save Profile"
+            message="Are you sure you want to save your profile changes?"
+            onConfirm={handleSaveConfirm}
+            onCancel={() => setShowSaveModal(false)}
+            confirmText="Save"
           />
-        )}
-        <input placeholder="4-digit Passcode" value={passcode} onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} style={inputStyle} inputMode="numeric" maxLength={4} />
-        {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
-        <button type="submit" style={buttonStyle}>Login</button>
-      </form>
-      <div style={{ display: 'grid', gap: '8px', width: '100%', maxWidth: 420, marginTop: '16px' }}>
-        <button type="button" onClick={() => onRegister && onRegister()} style={{ ...buttonStyle, background: '#10b981' }}>Register</button>
-        <button type="button" onClick={() => {
-          console.log('Forgot Passcode button clicked');
-          setError(null); // Clear any existing error when navigating to forgot passcode
-          setShowForgotPasscode(true);
-        }} style={{ ...buttonStyle, background: '#ef4444' }}>Forgot Passcode</button>
-      </div>
+          
+          {/* Delete Confirmation Modal */}
+          <ConfirmationModal
+            isOpen={showDeleteModal}
+            title="Delete Profile"
+            message="This will permanently delete your account and all associated data. This action cannot be undone. Are you sure you want to continue?"
+            onConfirm={handleDeleteConfirm}
+            onCancel={() => setShowDeleteModal(false)}
+            confirmText="Delete Profile"
+            isDanger={true}
+          />
+        </>
+      )}
     </div>
   )
 }
@@ -361,4 +374,4 @@ const buttonStyle: React.CSSProperties = {
   padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer'
 }
 
-export default StaffLogin
+export default ProfileTab
