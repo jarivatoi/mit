@@ -343,7 +343,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
         <button type="submit" style={buttonStyle}>Login</button>
       </form>
       <div style={{ display: 'grid', gap: '8px', width: '100%', maxWidth: 420, marginTop: '16px' }}>
-        <button type="button" onClick={() => onRegister && onRegister()} style={{ ...buttonStyle, background: '#10b981' }}>Register</button>
+        <button type="button" onClick={() => onRegister && onRegister()} style={{ ...buttonStyle, background: '#10b981' }}>Registration</button>
         <button type="button" onClick={() => {
           console.log('Forgot Passcode button clicked');
           setError(null); // Clear any existing error when navigating to forgot passcode
