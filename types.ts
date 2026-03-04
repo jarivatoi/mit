@@ -22,12 +22,15 @@ export interface ShiftCombination {
   id: string;
   combination: string;
   hours: number;
+  manualAmount?: number; // Manual Rs amount when manual mode is enabled
+  useManualAmount?: boolean; // Whether to use manual amount instead of calculated
 }
 
 export interface Settings {
   basicSalary: number;
   hourlyRate: number;
   shiftCombinations: ShiftCombination[];
+  useManualMode?: boolean; // Manual mode toggle state
 }
 
 export interface MonthlySalaries {
