@@ -277,7 +277,9 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
                 cursor: 'pointer',
                 padding: '8px',
                 fontSize: '18px',
-                color: '#6b7280'
+                color: '#6b7280',
+                userSelect: 'none',
+                WebkitUserSelect: 'none'
               }}
             >
               {showPasscode ? '🙈' : '👁️'}
@@ -342,7 +344,9 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
                   cursor: 'pointer',
                   padding: '8px',
                   fontSize: '18px',
-                  color: '#6b7280'
+                  color: '#6b7280',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none'
                 }}
               >
                 {showNewPasscode ? '🙈' : '👁️'}
@@ -373,11 +377,14 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
                   cursor: 'pointer',
                   padding: '8px',
                   fontSize: '18px',
-                  color: '#6b7280'
+                  color: '#6b7280',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none'
                 }}
               >
                 {showConfirmPasscode ? '🙈' : '👁️'}
               </button>
+
             </div>
 
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
@@ -441,7 +448,7 @@ const inputStyle: React.CSSProperties = {
   padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, textAlign: 'center'
 }
 const buttonStyle: React.CSSProperties = {
-  padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer'
+  padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none'
 }
 
 export default ProfileTab
