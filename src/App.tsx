@@ -469,8 +469,20 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             color: '#64748b',
             marginBottom: 24
           }}>
-            Preparing your calendar and settings
+            Preparing your calendar and settings...
           </p>
+          
+             <h1 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#1e293b',
+            marginBottom: 8
+          }}>
+            Created By NARAYYA
+          </h1>
+          
+          
+          
           
           <div style={{
             width: '100%',
