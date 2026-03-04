@@ -153,7 +153,7 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
 
           <div className="text-center mb-6">
             <p className="text-gray-700 mb-4">
-              This will clear all shifts for <strong>{monthYearDisplay}</strong>. This action cannot be undone.
+              This will clear all data for <strong>{monthYearDisplay}</strong>. This action cannot be undone.
             </p>
             
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -166,6 +166,7 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
                   <ul className="text-sm text-red-700 space-y-1">
                     <li>• All scheduled shifts for the month</li>
                     <li>• All special date markings</li>
+                    <li>• All notes added to dates</li>
                     <li>• All shift combinations and data</li>
                   </ul>
                 </div>
