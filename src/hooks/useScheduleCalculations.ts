@@ -103,9 +103,9 @@ export const useScheduleCalculations = (
           return comboKey === shiftId;
         });
         
-        if (combination && (effectiveHourlyRate || combination.useManualAmount)) {
+        if (combination && (effectiveHourlyRate || (settings.useManualMode && combination.useManualAmount))) {
           // Use manual amount if enabled, otherwise calculate from hours
-          const shiftAmount = combination.useManualAmount && combination.manualAmount !== undefined
+          const shiftAmount = settings.useManualMode && combination.useManualAmount && combination.manualAmount !== undefined
             ? combination.manualAmount
             : combination.hours * effectiveHourlyRate;
           total += shiftAmount;
@@ -207,19 +207,19 @@ export const useScheduleCalculations = (
           return comboKey === combinationKey;
         });
         
-        if (multiCombination && (effectiveHourlyRate || multiCombination.useManualAmount)) {
+        if (multiCombination && (effectiveHourlyRate || (settings.useManualMode && multiCombination.useManualAmount))) {
           // Subtract individual shift amounts already added
           const individualTotal = dayShifts.reduce((sum, shiftId) => {
             const singleCombo = settings.shiftCombinations.find(combo => combo.id === shiftId);
             // Use manual amount if enabled for individual shifts
-            const shiftAmount = singleCombo?.useManualAmount && singleCombo.manualAmount !== undefined
+            const shiftAmount = settings.useManualMode && singleCombo?.useManualAmount && singleCombo.manualAmount !== undefined
               ? singleCombo.manualAmount
               : (singleCombo ? singleCombo.hours * effectiveHourlyRate : 0);
             return sum + shiftAmount;
           }, 0);
           
           // Use manual amount for multi-combination if enabled
-          const multiAmount = multiCombination.useManualAmount && multiCombination.manualAmount !== undefined
+          const multiAmount = settings.useManualMode && multiCombination.useManualAmount && multiCombination.manualAmount !== undefined
             ? multiCombination.manualAmount
             : multiCombination.hours * effectiveHourlyRate;
           const difference = multiAmount - individualTotal;
