@@ -14,10 +14,13 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
   const [idNumber, setIdNumber] = useState('')
   const [showLogin, setShowLogin] = useState(false)
   const [passcode, setPasscode] = useState('')
+  const [showPasscode, setShowPasscode] = useState(false)
   const [forgotPasscode, setForgotPasscode] = useState(false)
   const [tempIdNumber, setTempIdNumber] = useState('')
   const [newPasscode, setNewPasscode] = useState('')
   const [confirmPasscode, setConfirmPasscode] = useState('')
+  const [showNewPasscode, setShowNewPasscode] = useState(false)
+  const [showConfirmPasscode, setShowConfirmPasscode] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -248,7 +251,39 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
         <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
           <h2 style={{ textAlign: 'center' }}>Enter Passcode</h2>
-          <input placeholder="4-digit Passcode" value={passcode} onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} style={inputStyle} inputMode="numeric" maxLength={4} autoFocus />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input 
+              placeholder="4-digit Passcode" 
+              value={passcode} 
+              onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+              style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
+              type={showPasscode ? 'text' : 'password'}
+              inputMode="numeric" 
+              maxLength={4}
+              autoFocus
+            />
+            <button
+              type="button"
+              onMouseDown={() => setShowPasscode(true)}
+              onMouseUp={() => setShowPasscode(false)}
+              onMouseLeave={() => setShowPasscode(false)}
+              onTouchStart={() => setShowPasscode(true)}
+              onTouchEnd={() => setShowPasscode(false)}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px',
+                fontSize: '18px',
+                color: '#6b7280'
+              }}
+            >
+              {showPasscode ? '🙈' : '👁️'}
+            </button>
+          </div>
+
           {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
           <button type="submit" style={buttonStyle}>Login</button>
           <button type="button" onClick={() => {setShowLogin(false); setForgotPasscode(false);}} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
@@ -282,22 +317,69 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
         <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
             <h2 style={{ textAlign: 'center' }}>Update Passcode</h2>
-            <input 
-              placeholder="New 4-digit Passcode" 
-              value={newPasscode} 
-              onChange={e => setNewPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-              style={inputStyle} 
-              inputMode="numeric" 
-              maxLength={4}
-            />
-            <input 
-              placeholder="Re-enter Passcode" 
-              value={confirmPasscode} 
-              onChange={e => setConfirmPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-              style={inputStyle} 
-              inputMode="numeric" 
-              maxLength={4}
-            />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input 
+                placeholder="New 4-digit Passcode" 
+                value={newPasscode} 
+                onChange={e => setNewPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
+                type={showNewPasscode ? 'text' : 'password'}
+                inputMode="numeric" 
+                maxLength={4}
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowNewPasscode(true)}
+                onMouseUp={() => setShowNewPasscode(false)}
+                onMouseLeave={() => setShowNewPasscode(false)}
+                onTouchStart={() => setShowNewPasscode(true)}
+                onTouchEnd={() => setShowNewPasscode(false)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '8px',
+                  fontSize: '18px',
+                  color: '#6b7280'
+                }}
+              >
+                {showNewPasscode ? '🙈' : '👁️'}
+              </button>
+            </div>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input 
+                placeholder="Re-enter Passcode" 
+                value={confirmPasscode} 
+                onChange={e => setConfirmPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
+                type={showConfirmPasscode ? 'text' : 'password'}
+                inputMode="numeric" 
+                maxLength={4}
+              />
+              <button
+                type="button"
+                onMouseDown={() => setShowConfirmPasscode(true)}
+                onMouseUp={() => setShowConfirmPasscode(false)}
+                onMouseLeave={() => setShowConfirmPasscode(false)}
+                onTouchStart={() => setShowConfirmPasscode(true)}
+                onTouchEnd={() => setShowConfirmPasscode(false)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '8px',
+                  fontSize: '18px',
+                  color: '#6b7280'
+                }}
+              >
+                {showConfirmPasscode ? '🙈' : '👁️'}
+              </button>
+            </div>
+
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
             <button onClick={handleUpdatePasscode} style={buttonStyle}>Update Passcode</button>
             <button type="button" onClick={() => {setForgotPasscode(false); setNewPasscode(''); setConfirmPasscode(''); setTempIdNumber('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Cancel</button>
