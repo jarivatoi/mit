@@ -9,6 +9,7 @@ import { useIndexedDB, useScheduleData } from './hooks/useIndexedDB';
 import { DEFAULT_SHIFT_COMBINATIONS } from './constants';
 import { AddToHomescreen } from './utils/addToHomescreen';
 import { Settings } from './types';
+import { DateNotes } from './types';
 import { gsap } from 'gsap';
 import StaffOnboard from './components/StaffOnboard';
 import StaffLogin from './components/StaffLogin';
@@ -82,6 +83,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
 
   // Use IndexedDB hooks
   const { schedule, specialDates, setSchedule, setSpecialDates } = useScheduleData();
+  const [dateNotes, setDateNotes] = useIndexedDB<DateNotes>('dateNotes', {});
   const [scheduleTitle, setScheduleTitle] = useIndexedDB<string>('scheduleTitle', 'Work Schedule', 'metadata');
   const [settings, setSettings] = useIndexedDB<Settings>('workSettings', {
     basicSalary: 35000,
@@ -180,7 +182,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
 
     window.addEventListener('navigateToMonth', handleNavigateToMonth as EventListener);
     return () => window.removeEventListener('navigateToMonth', handleNavigateToMonth as EventListener);
-  }, [schedule, specialDates]);
+  }, [schedule, specialDates, dateNotes]);
   
   // Listen for tab switch requests
   useEffect(() => {
@@ -198,7 +200,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
       window.removeEventListener('switchToCalendarTab', handleSwitchToCalendar);
       window.removeEventListener('debugCalendarState', handleDebugCalendarState);
     };
-  }, [schedule, specialDates, currentDate]);
+  }, [schedule, specialDates, currentDate, dateNotes]);
   
   // Initialize content animation when component mounts
   useEffect(() => {
@@ -281,6 +283,13 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
     setRefreshKey(prev => prev + 1);
   };
 
+  const handleUpdateNote = (dateKey: string, note: string) => {
+    setDateNotes(prev => ({
+      ...prev,
+      [dateKey]: note
+    }));
+  };
+
   // Render the appropriate tab content
   const renderTabContent = () => {
     switch (activeTab) {
@@ -292,6 +301,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             currentDate={currentDate}
             schedule={schedule}
             specialDates={specialDates}
+            dateNotes={dateNotes}
             onDateClick={handleDateClick}
             onNavigateMonth={navigateMonth}
             totalAmount={totalAmount}
@@ -301,8 +311,9 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             onTitleUpdate={setScheduleTitle}
             setSchedule={setSchedule}
             setSpecialDates={setSpecialDates}
-            monthlySalary={0} // Pass 0 to let calendar use global salary logic
-            globalSalary={settings.basicSalary} // Pass global salary from settings
+            setDateNotes={setDateNotes}
+            monthlySalary={0}
+            globalSalary={settings.basicSalary}
           />
         );
       case 'settings':
@@ -390,6 +401,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             currentDate={currentDate}
             schedule={schedule}
             specialDates={specialDates}
+            dateNotes={dateNotes}
             onDateClick={handleDateClick}
             onNavigateMonth={navigateMonth}
             totalAmount={totalAmount}
@@ -399,8 +411,9 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             onTitleUpdate={setScheduleTitle}
             setSchedule={setSchedule}
             setSpecialDates={setSpecialDates}
-            monthlySalary={0} // Pass 0 to let calendar use global salary logic
-            globalSalary={settings.basicSalary} // Pass global salary from settings
+            setDateNotes={setDateNotes}
+            monthlySalary={0}
+            globalSalary={settings.basicSalary}
           />
         );
     }
@@ -532,8 +545,10 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
           selectedDate={selectedDate}
           schedule={schedule}
           specialDates={specialDates}
+          dateNotes={dateNotes}
           onClose={() => setShowModal(false)}
           onToggleShift={toggleShift}
+          onUpdateNote={handleUpdateNote}
           onToggleSpecialDate={(dateKey: string, isSpecial: boolean) => {
             setSpecialDates(prev => ({
               ...prev,
