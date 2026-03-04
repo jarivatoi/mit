@@ -125,21 +125,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Handle manual amount input changes
   const handleManualAmountChange = (combinationId: string, value: string) => {
-    const cleanValue = value.replace(/[^\d]/g, '');
-    setManualAmounts(prev => ({ ...prev, [combinationId]: cleanValue }));
-    
-    // Update settings with manual amount and flag
-    if (useManualMode) {
-      const numericValue = parseInt(cleanValue, 10) || 0;
-      // We need to pass this up to App to update settings
-      // For now, just store in local state - will be persisted on blur
+    // Allow digits and one decimal point
+    const cleanValue = value.replace(/[^0-9.]/g, '');
+    // Ensure only one decimal point
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) {
+      return; // Don't update if more than one decimal point
     }
+    setManualAmounts(prev => ({ ...prev, [combinationId]: cleanValue }));
   };
 
   // Save manual amounts to settings on blur
   const handleManualAmountBlur = (combinationId: string) => {
     const value = manualAmounts[combinationId] || '';
-    const numericValue = parseInt(value, 10) || 0;
+    const numericValue = parseFloat(value) || 0;
     
     // Update settings with the manual amount and enable the useManualAmount flag
     onUpdateManualAmount(combinationId, numericValue);
@@ -322,12 +321,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   {useManualMode ? (
                     <input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       value={getManualAmountValue(combination)}
                       onChange={(e) => handleManualAmountChange(combination.id, e.target.value)}
                       onBlur={() => handleManualAmountBlur(combination.id)}
                       className="w-full px-2 py-2 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center text-sm font-mono text-indigo-700"
-                      placeholder="0"
+                      placeholder="0.00"
                     />
                   ) : (
                     <span className="px-2 py-2 bg-gray-100 rounded text-center text-sm font-mono text-gray-700 block">
@@ -377,12 +376,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     {useManualMode ? (
                       <input
                         type="text"
-                        inputMode="numeric"
+                        inputMode="decimal"
                         value={getManualAmountValue(combination)}
                         onChange={(e) => handleManualAmountChange(combination.id, e.target.value)}
                         onBlur={() => handleManualAmountBlur(combination.id)}
                         className="w-24 px-2 py-1 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center font-mono text-indigo-700"
-                        placeholder="0"
+                        placeholder="0.00"
                       />
                     ) : (
                       <span className="font-mono text-gray-700">
