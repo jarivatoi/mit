@@ -505,7 +505,8 @@ export const Calendar: React.FC<CalendarProps> = ({
     // Check if date has content before showing modal
     const hasShifts = schedule[dateKey] && schedule[dateKey].length > 0;
     const isSpecial = specialDates[dateKey] === true;
-    const hasContent = hasShifts || isSpecial;
+    const hasNote = dateNotes[dateKey] && dateNotes[dateKey].trim() !== '';
+    const hasContent = hasShifts || isSpecial || hasNote;
     
     // Only show modal if date has content to clear
     if (!hasContent) {
@@ -544,6 +545,13 @@ export const Calendar: React.FC<CalendarProps> = ({
           const newSpecialDates = { ...prev };
           delete newSpecialDates[dateKey];
           return newSpecialDates;
+        });
+        
+        // Clear note for this specific date
+        setDateNotes(prev => {
+          const newDateNotes = { ...prev };
+          delete newDateNotes[dateKey];
+          return newDateNotes;
         });
         
         console.log(`✅ Successfully cleared date ${dateKey}`);
@@ -1374,6 +1382,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         selectedDate={dateToDelete}
         schedule={schedule}
         specialDates={specialDates}
+        dateNotes={dateNotes}
         onConfirm={handleClearDate}
         onCancel={() => {
           setShowClearDateModal(false);
