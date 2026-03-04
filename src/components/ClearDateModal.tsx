@@ -7,6 +7,7 @@ interface ClearDateModalProps {
   selectedDate: string | null;
   schedule: Record<string, string[]>;
   specialDates: Record<string, boolean>;
+  dateNotes?: Record<string, string>;
   onConfirm: (dateKey: string) => Promise<void>;
   onCancel: () => void;
 }
@@ -16,6 +17,7 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
   selectedDate,
   schedule,
   specialDates,
+  dateNotes = {},
   onConfirm,
   onCancel
 }) => {
@@ -109,6 +111,7 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
   const getContentSummary = () => {
     const shifts = schedule[selectedDate] || [];
     const isSpecial = specialDates[selectedDate] === true;
+    const note = dateNotes[selectedDate] || '';
     
     const items = [];
     if (shifts.length > 0) {
@@ -116,6 +119,9 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
     }
     if (isSpecial) {
       items.push('special date marking');
+    }
+    if (note && note.trim() !== '') {
+      items.push('note');
     }
     
     return items.join(' and ');
