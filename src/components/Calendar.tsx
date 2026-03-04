@@ -417,7 +417,15 @@ export const Calendar: React.FC<CalendarProps> = ({
              isSpecial === true;
     });
     
-    return hasShifts || hasSpecialDates;
+    // Check for notes in current month
+    const hasNotes = Object.entries(dateNotes).some(([dateKey, note]) => {
+      const workDate = new Date(dateKey);
+      return workDate.getMonth() === currentMonth && 
+             workDate.getFullYear() === currentYear && 
+             note && note.trim() !== '';
+    });
+    
+    return hasShifts || hasSpecialDates || hasNotes;
   };
 
   // Long-press handlers for month header
