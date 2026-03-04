@@ -1,20 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, AlertCircle } from 'lucide-react';
 import { Settings, ShiftCombination } from '../types';
 
 interface SettingsPanelProps {
   settings: Settings;
+  useManualMode?: boolean;
+  onToggleManualMode?: (enabled: boolean) => void;
   onUpdateBasicSalary: (salary: number) => void;
   onUpdateShiftHours: (combinationId: string, hours: number) => void;
+  onUpdateManualAmount?: (combinationId: string, manualAmount: number) => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   settings,
+  useManualMode: useManualModeProp = false,
+  onToggleManualMode: onToggleManualModeProp = () => {},
   onUpdateBasicSalary,
-  onUpdateShiftHours
+  onUpdateShiftHours,
+  onUpdateManualAmount = () => {}
 }) => {
   const [salaryDisplayValue, setSalaryDisplayValue] = useState('');
   const [shiftHoursInputs, setShiftHoursInputs] = useState<Record<string, string>>({});
+  const [manualAmounts, setManualAmounts] = useState<Record<string, string>>({});
+  
+  // Use prop or fallback to local state for backward compatibility
+  const useManualMode = useManualModeProp;
+  
+  // Initialize manual amounts from settings on mount and when settings change
+  useEffect(() => {
+    const initialAmounts: Record<string, string> = {};
+    settings.shiftCombinations.forEach(combo => {
+      // Try to get manual amount first, otherwise calculate from hours
+      if (combo.useManualAmount && combo.manualAmount !== undefined) {
+        initialAmounts[combo.id] = Math.round(combo.manualAmount).toString();
+      } else {
+        const currentAmount = calculateAmount(combo.hours || 0);
+        initialAmounts[combo.id] = Math.round(currentAmount).toString();
+      }
+    });
+    setManualAmounts(initialAmounts);
+  }, [settings]);
+  
+  const handleManualModeToggle = (enabled: boolean) => {
+    onToggleManualModeProp(enabled);
+  };
 
   const formatCurrency = (amount: number) => {
     return `Rs ${amount.toLocaleString('en-US', {
@@ -92,6 +121,37 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return shiftHoursInputs[combination.id];
     }
     return combination.hours === 0 ? '' : combination.hours.toString();
+  };
+
+  // Handle manual amount input changes
+  const handleManualAmountChange = (combinationId: string, value: string) => {
+    const cleanValue = value.replace(/[^\d]/g, '');
+    setManualAmounts(prev => ({ ...prev, [combinationId]: cleanValue }));
+    
+    // Update settings with manual amount and flag
+    if (useManualMode) {
+      const numericValue = parseInt(cleanValue, 10) || 0;
+      // We need to pass this up to App to update settings
+      // For now, just store in local state - will be persisted on blur
+    }
+  };
+
+  // Save manual amounts to settings on blur
+  const handleManualAmountBlur = (combinationId: string) => {
+    const value = manualAmounts[combinationId] || '';
+    const numericValue = parseInt(value, 10) || 0;
+    
+    // Update settings with the manual amount and enable the useManualAmount flag
+    onUpdateManualAmount(combinationId, numericValue);
+  };
+
+  // Get display value for manual amount input
+  const getManualAmountValue = (combination: ShiftCombination) => {
+    if (combination.id in manualAmounts) {
+      return manualAmounts[combination.id];
+    }
+    const currentAmount = calculateAmount(combination.hours || 0);
+    return Math.round(currentAmount).toString();
   };
 
   // Show error if settings are not properly loaded
@@ -217,7 +277,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
       {/* Work Hours Configuration */}
       <div className="mb-6">
-        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 text-center">Work Hours Configuration</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 text-center flex-1">Work Hours Configuration</h3>
+          <div className="flex items-center space-x-2 mr-4">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useManualMode}
+                onChange={(e) => handleManualModeToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              <span className="ml-2 text-sm font-medium text-gray-700">Manual</span>
+            </label>
+          </div>
+        </div>
         
         {/* Mobile Card Layout */}
         <div className="block sm:hidden space-y-3">
@@ -242,10 +316,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1 text-center">Amount</label>
-                  <span className="px-2 py-2 bg-gray-100 rounded text-center text-sm font-mono text-gray-700 block">
-                    {formatCurrency(calculateAmount(combination.hours || 0))}
-                  </span>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 text-center">
+                    {useManualMode ? 'Amount (Rs)' : 'Amount'}
+                  </label>
+                  {useManualMode ? (
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={getManualAmountValue(combination)}
+                      onChange={(e) => handleManualAmountChange(combination.id, e.target.value)}
+                      onBlur={() => handleManualAmountBlur(combination.id)}
+                      className="w-full px-2 py-2 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center text-sm font-mono text-indigo-700"
+                      placeholder="0"
+                    />
+                  ) : (
+                    <span className="px-2 py-2 bg-gray-100 rounded text-center text-sm font-mono text-gray-700 block">
+                      {formatCurrency(calculateAmount(combination.hours || 0))}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -264,7 +352,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   Hours
                 </th>
                 <th className="border border-gray-300 px-4 py-3 text-center font-semibold text-gray-700">
-                  Amount (Rs)
+                  {useManualMode ? 'Amount (Rs)' : 'Amount (Rs)'}
                 </th>
               </tr>
             </thead>
@@ -285,9 +373,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       placeholder="0"
                     />
                   </td>
-                  <td className="border border-gray-300 px-4 py-3 font-mono text-gray-700 text-center">
-                    {formatCurrency(calculateAmount(combination.hours || 0))}
+                  <td className="border border-gray-300 px-4 py-3 text-center">
+                    {useManualMode ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={getManualAmountValue(combination)}
+                        onChange={(e) => handleManualAmountChange(combination.id, e.target.value)}
+                        onBlur={() => handleManualAmountBlur(combination.id)}
+                        className="w-24 px-2 py-1 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center font-mono text-indigo-700"
+                        placeholder="0"
+                      />
+                    ) : (
+                      <span className="font-mono text-gray-700">
+                        {formatCurrency(calculateAmount(combination.hours || 0))}
+                      </span>
+                    )}
                   </td>
+
                 </tr>
               ))}
             </tbody>
