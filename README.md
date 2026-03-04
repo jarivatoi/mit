@@ -1,8 +1,6 @@
 # X-ray MIT
 
-A professional work schedule management system built with React, TypeScript, and Supabase.
-
-## Supabase Configuration for GitHub Pages
+A professional work schedule management system.
 
 ## Features
 
