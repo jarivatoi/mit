@@ -78,7 +78,7 @@ const StaffOnboard: React.FC<{ onComplete?: (u: OnboardResult) => void; onBack?:
   }
 
   const inputStyle: React.CSSProperties = { padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, textAlign: 'center' }
-  const btn: React.CSSProperties = { padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer' }
+  const btn: React.CSSProperties = { padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }
   return (
     <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12, width: '100%', maxWidth: 420 }}>
@@ -112,7 +112,9 @@ const StaffOnboard: React.FC<{ onComplete?: (u: OnboardResult) => void; onBack?:
               cursor: 'pointer',
               padding: '8px',
               fontSize: '18px',
-              color: '#6b7280'
+              color: '#6b7280',
+              userSelect: 'none',
+              WebkitUserSelect: 'none'
             }}
           >
             {showPasscode ? '🙈' : '👁️'}
