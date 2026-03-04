@@ -28,21 +28,29 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       position: 'fixed',
       top: 0,
       left: 0,
-      right: 0,
-      bottom: 0,
+      width: '100vw',
+      height: '100vh',
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 99999,
+      overflow: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y'
     }}>
       <div style={{
         backgroundColor: 'white',
-        borderRadius: 8,
+        borderRadius: 16,
         padding: 24,
-        maxWidth: 400,
+        maxWidth: '400px',
         width: '90%',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        margin: '16px',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-y'
       }}>
         <h3 style={{ 
           marginTop: 0, 
