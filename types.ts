@@ -40,6 +40,7 @@ export interface MonthlySalaries {
 export interface ExportData {
   schedule: DaySchedule;
   specialDates: SpecialDates;
+  dateNotes?: DateNotes;
   settings: Settings;
   scheduleTitle: string;
   exportDate: string;
