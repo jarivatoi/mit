@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Check } from 'lucide-react';
 import { SHIFTS } from '../constants';
-import { DaySchedule, SpecialDates } from '../types';
+import { DaySchedule, SpecialDates, DateNotes } from '../types';
+import { ScrollingText } from './ScrollingText';
 
 interface ShiftModalProps {
   selectedDate: string | null;
   schedule: DaySchedule;
   specialDates: SpecialDates;
+  dateNotes: DateNotes;
   onToggleShift: (shiftId: string) => void;
   onToggleSpecialDate: (dateKey: string, isSpecial: boolean) => void;
+  onUpdateNote: (dateKey: string, note: string) => void;
   onClose: () => void;
 }
 
@@ -16,25 +19,43 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
   selectedDate,
   schedule,
   specialDates,
+  dateNotes,
   onToggleShift,
   onToggleSpecialDate,
+  onUpdateNote,
   onClose
 }) => {
   const [isSpecialDate, setIsSpecialDate] = useState(false);
   const [localSchedule, setLocalSchedule] = useState<Record<string, string[]>>({});
+  const [noteText, setNoteText] = useState('');
 
   // Initialize special date state when modal opens
   useEffect(() => {
     if (selectedDate) {
       setIsSpecialDate(specialDates[selectedDate] === true);
       setLocalSchedule(schedule);
+      setNoteText(dateNotes[selectedDate] || '');
     }
-  }, [selectedDate, specialDates, schedule]);
+  }, [selectedDate, specialDates, schedule, dateNotes]);
 
   // Update local schedule when parent schedule changes
   useEffect(() => {
     setLocalSchedule(schedule);
   }, [schedule]);
+
+  // Update note text when dateNotes changes
+  useEffect(() => {
+    if (selectedDate) {
+      setNoteText(dateNotes[selectedDate] || '');
+    }
+  }, [dateNotes, selectedDate]);
+
+  const handleNoteChange = (newNote: string) => {
+    if (!selectedDate) return;
+    
+    setNoteText(newNote);
+    onUpdateNote(selectedDate, newNote);
+  };
 
   const handleShiftToggle = (shiftId: string) => {
     if (!selectedDate) return;
@@ -429,6 +450,26 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
               </p>
             </div>
           )}
+
+          {/* Note Field */}
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2 select-none">
+              Note for this date
+            </label>
+            <textarea
+              value={noteText}
+              onChange={(e) => handleNoteChange(e.target.value)}
+              placeholder="Add a note for this date..."
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 select-none"
+              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+              rows={3}
+            />
+            {noteText && noteText.length > 30 && (
+              <p className="text-xs text-gray-500 mt-1 select-none">
+                Note will appear as scrolling text on calendar
+              </p>
+            )}
+          </div>
 
           {/* Add extra padding at bottom to ensure all content is accessible */}
           <div className="h-8" />
