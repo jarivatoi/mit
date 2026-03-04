@@ -217,6 +217,7 @@ export const MonthClearModal: React.FC<MonthClearModalProps> = ({
                 <ul className="text-sm text-red-700 space-y-1">
                   <li>• All scheduled shifts for {monthYearDisplay}</li>
                   <li>• All special date markings</li>
+                  <li>• All notes added to dates</li>
                   <li>• All shift combinations and data</li>
                   <li>• All calculated amounts and totals</li>
                 </ul>
