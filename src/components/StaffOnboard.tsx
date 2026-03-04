@@ -9,6 +9,7 @@ const StaffOnboard: React.FC<{ onComplete?: (u: OnboardResult) => void; onBack?:
   const [idNumber, setIdNumber] = useState('')
   const [confirmIdNumber, setConfirmIdNumber] = useState('')
   const [passcode, setPasscode] = useState('')
+  const [showPasscode, setShowPasscode] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Check if user is online
@@ -86,7 +87,37 @@ const StaffOnboard: React.FC<{ onComplete?: (u: OnboardResult) => void; onBack?:
         <input placeholder="Name" value={name} onChange={e => setName(capitalizeName(e.target.value))} style={inputStyle} />
         <input placeholder="ID Number" value={idNumber} onChange={e => setIdNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14))} style={inputStyle} autoCapitalize="characters" maxLength={14} />
         <input placeholder="Re-enter ID Number (verification)" value={confirmIdNumber} onChange={e => setConfirmIdNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14))} style={inputStyle} autoCapitalize="characters" maxLength={14} />
-        <input placeholder="4-digit Passcode" value={passcode} onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} style={inputStyle} inputMode="numeric" maxLength={4} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input 
+            placeholder="4-digit Passcode" 
+            value={passcode} 
+            onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+            style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
+            type={showPasscode ? 'text' : 'password'}
+            inputMode="numeric" 
+            maxLength={4}
+          />
+          <button
+            type="button"
+            onMouseDown={() => setShowPasscode(true)}
+            onMouseUp={() => setShowPasscode(false)}
+            onMouseLeave={() => setShowPasscode(false)}
+            onTouchStart={() => setShowPasscode(true)}
+            onTouchEnd={() => setShowPasscode(false)}
+            style={{
+              position: 'absolute',
+              right: '10px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              fontSize: '18px',
+              color: '#6b7280'
+            }}
+          >
+            {showPasscode ? '🙈' : '👁️'}
+          </button>
+        </div>
         {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
         <button type="submit" style={btn}>Register</button>
         {onBack && (
