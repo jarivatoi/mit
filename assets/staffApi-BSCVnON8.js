@@ -1,0 +1,1 @@
+import{s as e}from"./index-CHCDeveL.js";const s=async()=>{if(!e)return[];try{const{data:r,error:t}=await e.from("staff_members").select("*").order("surname",{ascending:!0});return t?[]:r||[]}catch{return[]}};export{s as fetchStaffMembers};
