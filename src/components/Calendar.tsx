@@ -4,10 +4,11 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Calculator, Edit3,
 import { Download } from 'lucide-react';
 import { gsap } from 'gsap';
 import { SHIFTS } from '../constants';
-import { DaySchedule, SpecialDates } from '../types';
+import { DaySchedule, SpecialDates, DateNotes } from '../types';
 import { ClearDateModal } from './ClearDateModal';
 import { ClearMonthModal } from './ClearMonthModal';
 import { MonthClearModal } from './MonthClearModal';
+import { ScrollingText } from './ScrollingText';
 // Calendar export modal removed
 import { formatMauritianRupees } from '../utils/currency';
 import { useLongPress } from '../hooks/useLongPress';
@@ -19,6 +20,7 @@ interface CalendarProps {
   currentDate: Date;
   schedule: DaySchedule;
   specialDates: SpecialDates;
+  dateNotes: DateNotes;
   onDateClick: (day: number) => void;
   onNavigateMonth: (direction: 'prev' | 'next') => void;
   totalAmount: number;
@@ -29,6 +31,7 @@ interface CalendarProps {
   onResetMonth?: (year: number, month: number) => void;
   setSchedule: React.Dispatch<React.SetStateAction<DaySchedule>>;
   setSpecialDates: React.Dispatch<React.SetStateAction<SpecialDates>>;
+  setDateNotes: React.Dispatch<React.SetStateAction<DateNotes>>;
   monthlySalary?: number;
   onMonthlySalaryChange?: (year: number, month: number, salary: number) => void;
   globalSalary?: number;
@@ -38,6 +41,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   currentDate,
   schedule,
   specialDates,
+  dateNotes,
   onDateClick,
   onNavigateMonth,
   totalAmount,
@@ -47,6 +51,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   onTitleUpdate,
   setSchedule,
   setSpecialDates,
+  setDateNotes,
   monthlySalary = 0,
   onMonthlySalaryChange,
   globalSalary = 0
@@ -347,6 +352,11 @@ export const Calendar: React.FC<CalendarProps> = ({
       
       return orderA - orderB;
     });
+  };
+
+  const getDateNote = (day: number) => {
+    const dateKey = formatDateKey(day);
+    return dateNotes[dateKey] || '';
   };
 
   const getShiftDisplay = (shiftId: string) => {
@@ -725,14 +735,16 @@ export const Calendar: React.FC<CalendarProps> = ({
           if (day) {
             const dayShifts = getDayShifts(day);
             const hasSpecial = isSpecialDate(day);
+            const hasNote = getDateNote(day) !== '';
             
-            // Count content lines: shifts + special text (if present)
-            // Maximum possible: SPECIAL (1 line) + 3 shifts (3 lines) = 4 total
+            // Count content lines: shifts + special text (if present) + note (if present)
+            // Maximum possible: SPECIAL (1 line) + 3 shifts (3 lines) + note (1 line) = 5 total
             let contentLines = dayShifts.length;
             if (hasSpecial) contentLines += 1; // Add 1 line for "SPECIAL" text
+            if (hasNote) contentLines += 1; // Add 1 line for note
             
-            // Cap at maximum possible content (should never exceed 4)
-            contentLines = Math.min(contentLines, 4);
+            // Cap at maximum possible content (should never exceed 5)
+            contentLines = Math.min(contentLines, 5);
             
             maxContentLines = Math.max(maxContentLines, contentLines);
           }
@@ -1267,6 +1279,18 @@ export const Calendar: React.FC<CalendarProps> = ({
                           </div>
                         ) : null;
                       })}
+                      
+                      {/* Note display */}
+                      {getDateNote(day) && (
+                        <div className="note-text text-[8px] sm:text-[10px] font-medium leading-tight text-indigo-600 flex-shrink-0 w-full select-none mt-0.5">
+                          <ScrollingText 
+                            text={getDateNote(day)} 
+                            pauseDuration={2}
+                            scrollDuration={3}
+                            className="text-center select-none"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
