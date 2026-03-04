@@ -85,10 +85,11 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
   const { schedule, specialDates, setSchedule, setSpecialDates } = useScheduleData();
   const [dateNotes, setDateNotes] = useIndexedDB<DateNotes>('dateNotes', {});
   const [scheduleTitle, setScheduleTitle] = useIndexedDB<string>('scheduleTitle', 'Work Schedule', 'metadata');
-  const [settings, setSettings] = useIndexedDB<Settings>('workSettings', {
+  const [settings, setSettings] = useIndexedDB<Settings & { useManualMode?: boolean }>('workSettings', {
     basicSalary: 35000,
     hourlyRate: 201.92,
-    shiftCombinations: DEFAULT_SHIFT_COMBINATIONS
+    shiftCombinations: DEFAULT_SHIFT_COMBINATIONS,
+    useManualMode: false // Add manual mode flag to settings
   });
 
   // Add refreshKey state
@@ -320,12 +321,24 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
         return (
           <SettingsPanel
             settings={settings}
+            useManualMode={settings.useManualMode}
             onUpdateBasicSalary={(salary) => setSettings(prev => ({ ...prev, basicSalary: salary }))}
             onUpdateShiftHours={(combinationId, hours) => {
               setSettings(prev => ({
                 ...prev,
                 shiftCombinations: prev.shiftCombinations.map(comb => 
                   comb.id === combinationId ? { ...comb, hours } : comb
+                )
+              }));
+            }}
+            onToggleManualMode={(enabled) => setSettings(prev => ({ ...prev, useManualMode: enabled }))}
+            onUpdateManualAmount={(combinationId, manualAmount) => {
+              setSettings(prev => ({
+                ...prev,
+                shiftCombinations: prev.shiftCombinations.map(comb => 
+                  comb.id === combinationId 
+                    ? { ...comb, manualAmount, useManualAmount: true }
+                    : comb
                 )
               }));
             }}
