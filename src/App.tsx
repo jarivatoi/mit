@@ -351,6 +351,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
               // Handle data import
               if (data.schedule) setSchedule(data.schedule);
               if (data.specialDates) setSpecialDates(data.specialDates);
+              if (data.dateNotes) setDateNotes(data.dateNotes);
               if (data.settings) setSettings(data.settings);
               if (data.scheduleTitle) setScheduleTitle(data.scheduleTitle);
               setRefreshKey(prev => prev + 1); // Force refresh calculations
@@ -365,6 +366,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
                 const exportData = {
                   schedule,
                   specialDates,
+                  dateNotes,
                   settings,
                   scheduleTitle,
                   exportDate: new Date().toISOString(),
