@@ -460,9 +460,14 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
               value={noteText}
               onChange={(e) => handleNoteChange(e.target.value)}
               placeholder="Add a note for this date..."
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 select-none"
-              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              style={{ 
+                userSelect: 'text', 
+                WebkitUserSelect: 'text',
+                WebkitTouchCallout: 'none'
+              }}
               rows={3}
+              autoFocus
             />
             {noteText && noteText.length > 30 && (
               <p className="text-xs text-gray-500 mt-1 select-none">
