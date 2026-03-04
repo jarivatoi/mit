@@ -32,10 +32,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     settings.shiftCombinations.forEach(combo => {
       // Try to get manual amount first, otherwise calculate from hours
       if (combo.useManualAmount && combo.manualAmount !== undefined) {
-        initialAmounts[combo.id] = Math.round(combo.manualAmount).toString();
+        // Preserve 2 decimal places for manual amounts
+        initialAmounts[combo.id] = combo.manualAmount.toFixed(2);
       } else {
         const currentAmount = calculateAmount(combo.hours || 0);
-        initialAmounts[combo.id] = Math.round(currentAmount).toString();
+        initialAmounts[combo.id] = currentAmount.toFixed(2);
       }
     });
     setManualAmounts(initialAmounts);
