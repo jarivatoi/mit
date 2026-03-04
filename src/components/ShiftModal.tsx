@@ -467,7 +467,6 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                 WebkitTouchCallout: 'none'
               }}
               rows={3}
-              autoFocus
             />
             {noteText && noteText.length > 30 && (
               <p className="text-xs text-gray-500 mt-1 select-none">
