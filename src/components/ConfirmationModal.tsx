@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 type ConfirmationModalProps = {
   isOpen: boolean;
@@ -23,7 +24,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
@@ -86,7 +87,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               background: 'white',
               color: '#6b7280',
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              flexShrink: 0
             }}
           >
             {cancelText}
@@ -100,14 +102,16 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               background: isDanger ? '#ef4444' : '#2563eb',
               color: 'white',
               fontWeight: 500,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              flexShrink: 0
             }}
           >
             {confirmText}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
