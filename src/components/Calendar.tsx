@@ -735,73 +735,43 @@ export const Calendar: React.FC<CalendarProps> = ({
   // Calculate number of rows needed
   const totalCells = calendarDays.length;
   const numberOfRows = Math.ceil(totalCells / 7);
+  
+  // Calculate square cell size based on viewport width
+  const getCellSize = () => {
+    const isDesktop = window.innerWidth >= 640;
+    const availableWidth = isDesktop ? window.innerWidth - 96 : window.innerWidth - 32; // Account for padding
+    const cellWidth = availableWidth / 7; // 7 columns
+    // Return actual cell width for perfect square, with reasonable minimums
+    return cellWidth < 50 ? 50 : cellWidth; // Only enforce minimum if extremely small
+  };
 
-  // Calculate dynamic row heights based on content - EXACTLY AS PROVIDED
-  const calculateRowHeights = () => {
-    // First calculate cell width (for square base)
-    const gap = window.innerWidth >= 640 ? 8 : 4; // gap between cells
-    const totalGaps = gap * 6; // 6 gaps for 7 columns
-    const horizontalPadding = window.innerWidth >= 640 ? 48 : 24; // left + right padding
-    const availableWidth = window.innerWidth - horizontalPadding - totalGaps;
-    const cellWidth = availableWidth / 7;
+  const cellSize = getCellSize();
+
+  // Resize listener to recalculate cell dimensions on zoom/window resize
+  useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout | null = null;
     
-    const rowHeights: string[] = [];
-    
-    for (let row = 0; row < numberOfRows; row++) {
-      let maxContentLines = 0;
-      
-      // Check each day in this row (7 days per row)
-      for (let col = 0; col < 7; col++) {
-        const dayIndex = row * 7 + col;
-        if (dayIndex < calendarDays.length) {
-          const day = calendarDays[dayIndex];
-          if (day) {
-            const dayShifts = getDayShifts(day);
-            const hasSpecial = isSpecialDate(day);
-            const hasNote = getDateNote(day) !== '';
-            
-            // Count content lines: shifts + special text (if present) + note (if present)
-            // Maximum possible: SPECIAL (1 line) + 3 shifts (3 lines) + note (1 line) = 5 total
-            let contentLines = dayShifts.length;
-            if (hasSpecial) contentLines += 1; // Add 1 line for "SPECIAL" text
-            if (hasNote) contentLines += 1; // Add 1 line for note
-            
-            // Cap at maximum possible content (should never exceed 5)
-            contentLines = Math.min(contentLines, 5);
-            
-            maxContentLines = Math.max(maxContentLines, contentLines);
-          }
-        }
+    const handleResize = () => {
+      // Debounce resize events to avoid excessive recalculations
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
       }
       
-      // Calculate height based on maximum content lines in the row
-      const baseHeight = window.innerWidth >= 640 ? 60 : 50; // Base height for date number
-      const lineHeight = window.innerWidth >= 640 ? 16 : 12; // Reduced height per content line
-      const padding = window.innerWidth >= 640 ? 16 : 12; // Top/bottom padding
-      
-      const calculatedHeight = baseHeight + (maxContentLines * lineHeight) + padding;
-      
-      // CRITICAL: Ensure minimum height equals cell width for square proportions
-      const minHeight = cellWidth;
-      const finalHeight = Math.max(calculatedHeight, minHeight);
-      rowHeights.push(`${finalHeight}px`);
-    }
+      resizeTimeout = setTimeout(() => {
+        // Force re-render by updating a dummy state
+        setShowDatePicker(prev => prev);
+      }, 150); // 150ms debounce
+    };
+
+    window.addEventListener('resize', handleResize);
     
-    return rowHeights;
-  };
-
-  const rowHeights = calculateRowHeights();
-
-  // Calculate cell width for square-like proportions
-  const calculateCellWidth = () => {
-    const gap = window.innerWidth >= 640 ? 8 : 4; // gap between cells
-    const totalGaps = gap * 6; // 6 gaps for 7 columns
-    const horizontalPadding = window.innerWidth >= 640 ? 48 : 24; // left + right padding
-    const availableWidth = window.innerWidth - horizontalPadding - totalGaps;
-    return availableWidth / 7;
-  };
-
-  const cellWidth = calculateCellWidth();
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+    };
+  }, []);
 
   return (
     <div className="bg-white overflow-hidden select-none" style={{
@@ -1229,12 +1199,11 @@ export const Calendar: React.FC<CalendarProps> = ({
                     : 'border-transparent'
                 }`}
                 style={{
-                  width: `${cellWidth}px`, // Fixed width based on viewport (square base)
-                  height: rowHeights[rowIndex], // Dynamic height based on content
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   display: 'flex',
-                  flexDirection: 'column'
+                  flexDirection: 'column',
+                  minHeight: `${cellSize}px` // Square size (width = height) but can grow with content
                 }}
                 onClick={() => day && handleDateClick(day)}
                onMouseDown={(e) => day && handleDateLongPressStart(day, e)}
@@ -1256,8 +1225,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                     
    
                     
-                    {/* Date header with special indicator and TODAY CIRCLE */}
-                    <div className={`flex-shrink-0 mb-1.5 sm:mb-2 relative ${isPastDate(day) ? 'z-30' : ''}`}>
+                    {/* Date header with special indicator */}
+                    <div className={`flex-shrink-0 mb-1 sm:mb-1.5 relative ${isPastDate(day) ? 'z-30' : ''}`}>
                       <div className={`text-sm sm:text-base text-center font-semibold ${getDateTextColor(day)} relative select-none`}>
                         {/* TODAY CIRCLE - PERFECT SIZE FOR 2-DIGIT DATES */}
                         {todayDate && (
@@ -1292,8 +1261,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                       </div>
                     </div>
                     
-                    {/* Content container - grows to fill available space */}
-                    <div className={`flex flex-col items-center justify-start space-y-0.5 sm:space-y-1 px-0.5 select-none min-w-0 flex-1 ${isPastDate(day) ? 'z-30' : ''}`}>
+                    {/* Content container - grows naturally with content */}
+                    <div className={`flex flex-col items-center justify-start space-y-0 sm:space-y-0.5 px-0.5 select-none min-w-0 ${isPastDate(day) ? 'z-30' : ''}`}>
                       {/* Special date indicator */}
                       {hasSpecialDate && (
                         <div 
