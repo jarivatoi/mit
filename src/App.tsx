@@ -359,8 +359,8 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             onExportData={async () => {
               // Export IndexedDB data
               try {
-                // Get current user for filename
-                const userName = user ? `${user.surname || 'User'}_${user.idNumber}` : 'User';
+                // Get current user for filename (surname only, no ID number)
+                const userName = user ? `${user.surname || 'User'}` : 'User';
                 
                 // Simple export of the schedule and settings data
                 const exportData = {
