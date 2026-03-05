@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Upload, Database as DataIcon, FileText, Database, HardDrive, Smartphone } from 'lucide-react';
-import { ConfirmationModal } from './ExportImportModal';
+import ConfirmationModal from './ConfirmationModal';
 
 interface MenuPanelProps {
   onImportData: (data: any) => void;
@@ -326,7 +326,6 @@ export const MenuPanel: React.FC<MenuPanelProps> = ({
         onConfirm={handleExportConfirm}
         onCancel={() => setShowExportModal(false)}
         confirmText="Export"
-        type="info"
       />
 
       {/* Import Modal */}
@@ -354,7 +353,6 @@ export const MenuPanel: React.FC<MenuPanelProps> = ({
           setImportError(null);
         }}
         confirmText="OK"
-        type={importError ? 'warning' : 'success'}
       />
     </div>
   );
