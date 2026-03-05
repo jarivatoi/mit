@@ -397,11 +397,14 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
   }
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ 
+      padding: isAdmin ? 0 : 16,
+      height: '100%',
+      boxSizing: 'border-box'
+    }}>
       {isAdmin ? (
         // Admin users only see Admin Panel
         <>
-          <h3 style={{ marginBottom: 12 }}>Admin Panel</h3>
           <AdminPanel />
         </>
       ) : (
