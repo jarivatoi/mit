@@ -736,8 +736,15 @@ export const Calendar: React.FC<CalendarProps> = ({
   const totalCells = calendarDays.length;
   const numberOfRows = Math.ceil(totalCells / 7);
 
-  // Calculate dynamic row heights based on content
+  // Calculate dynamic row heights based on content - EXACTLY AS PROVIDED
   const calculateRowHeights = () => {
+    // First calculate cell width (for square base)
+    const gap = window.innerWidth >= 640 ? 8 : 4; // gap between cells
+    const totalGaps = gap * 6; // 6 gaps for 7 columns
+    const horizontalPadding = window.innerWidth >= 640 ? 48 : 24; // left + right padding
+    const availableWidth = window.innerWidth - horizontalPadding - totalGaps;
+    const cellWidth = availableWidth / 7;
+    
     const rowHeights: string[] = [];
     
     for (let row = 0; row < numberOfRows; row++) {
@@ -773,8 +780,9 @@ export const Calendar: React.FC<CalendarProps> = ({
       const padding = window.innerWidth >= 640 ? 16 : 12; // Top/bottom padding
       
       const calculatedHeight = baseHeight + (maxContentLines * lineHeight) + padding;
-      const minHeight = window.innerWidth >= 640 ? 70 : 55; // Reduced minimum height
       
+      // CRITICAL: Ensure minimum height equals cell width for square proportions
+      const minHeight = cellWidth;
       const finalHeight = Math.max(calculatedHeight, minHeight);
       rowHeights.push(`${finalHeight}px`);
     }
@@ -783,6 +791,17 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const rowHeights = calculateRowHeights();
+
+  // Calculate cell width for square-like proportions
+  const calculateCellWidth = () => {
+    const gap = window.innerWidth >= 640 ? 8 : 4; // gap between cells
+    const totalGaps = gap * 6; // 6 gaps for 7 columns
+    const horizontalPadding = window.innerWidth >= 640 ? 48 : 24; // left + right padding
+    const availableWidth = window.innerWidth - horizontalPadding - totalGaps;
+    return availableWidth / 7;
+  };
+
+  const cellWidth = calculateCellWidth();
 
   return (
     <div className="bg-white overflow-hidden select-none" style={{
@@ -1210,7 +1229,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                     : 'border-transparent'
                 }`}
                 style={{
-                  height: rowHeights[rowIndex], // All cells in same row have same height
+                  width: `${cellWidth}px`, // Fixed width based on viewport (square base)
+                  height: rowHeights[rowIndex], // Dynamic height based on content
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   display: 'flex',
