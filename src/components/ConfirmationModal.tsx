@@ -3,7 +3,7 @@ import React from 'react';
 type ConfirmationModalProps = {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: string | React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   confirmText?: string;
