@@ -24,9 +24,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  console.log('🔔 MODAL OPEN:', title);
-  console.log('📍 Rendering to:', document.body);
-
   return createPortal(
     <div 
       data-test-modal="true"
@@ -89,9 +86,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             style={{
               padding: '10px 20px',
               borderRadius: 6,
-              border: '2px solid #d1d5db',
-              background: 'white',
-              color: '#6b7280',
+              border: '2px solid #ef4444',
+              background: '#ef4444',
+              color: 'white',
               fontWeight: 600,
               cursor: 'pointer',
               flexShrink: 0,
