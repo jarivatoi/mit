@@ -61,13 +61,17 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         }}>
           {title}
         </h3>
-        <p style={{ 
+        <div style={{ 
           marginBottom: 24, 
           color: '#6b7280',
           lineHeight: 1.5
         }}>
-          {message}
-        </p>
+          {typeof message === 'string' ? (
+            <p style={{ margin: 0 }}>{message}</p>
+          ) : (
+            message
+          )}
+        </div>
         <div style={{ 
           display: 'flex', 
           gap: 12, 
