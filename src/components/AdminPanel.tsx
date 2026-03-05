@@ -141,18 +141,43 @@ const AdminPanel: React.FC = () => {
   }
 
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, marginTop: 12 }}>
-      <h3>Admin Panel</h3>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ 
+      border: '1px solid #e5e7eb', 
+      borderRadius: 8, 
+      padding: 12, 
+      marginTop: 12,
+      display: 'flex',
+      flexDirection: 'column',
+      height: 'calc(100vh - 120px)', // Full height minus header and margins
+      minHeight: '400px'
+    }}>
+      <h3 style={{ marginBottom: 12, flexShrink: 0 }}>Admin Panel</h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0 }}>
         <span>Login enabled</span>
         <input type="checkbox" checked={loginEnabled} onChange={toggleLogin} />
       </div>
-      <div style={{ marginTop: 12 }}>
-        <strong>Staff Directory</strong>
+      <div style={{ 
+        flex: 1, 
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0, // Critical for nested scrollable content
+        overflow: 'hidden'
+      }}>
+        <strong style={{ marginBottom: 6 }}>Staff Directory</strong>
         {loading ? (
-          <div>Loading...</div>
+          <div style={{ padding: 12, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
         ) : (
-          <ul style={{ marginTop: 6, paddingLeft: 0, listStyle: 'none', maxHeight: 200, overflowY: 'auto' }}>
+          <ul style={{ 
+            marginTop: 0, 
+            paddingLeft: 0, 
+            listStyle: 'none', 
+            flex: 1,
+            overflowY: 'auto',
+            margin: 0,
+            padding: 0,
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y'
+          }}>
             {staff.map(s => (
               <li key={s.id} style={{ 
                 display: 'flex', 
