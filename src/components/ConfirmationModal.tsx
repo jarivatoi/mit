@@ -24,8 +24,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  console.log('🔔 MODAL OPEN:', title);
+  console.log('📍 Rendering to:', document.body);
+
   return createPortal(
-    <div style={{
+    <div 
+      data-test-modal="true"
+      style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -76,35 +81,44 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <div style={{ 
           display: 'flex', 
           gap: 12, 
-          justifyContent: 'flex-end' 
+          justifyContent: 'flex-end',
+          marginTop: '20px'
         }}>
           <button
             onClick={onCancel}
             style={{
-              padding: '10px 16px',
+              padding: '10px 20px',
               borderRadius: 6,
-              border: '1px solid #d1d5db',
+              border: '2px solid #d1d5db',
               background: 'white',
               color: '#6b7280',
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: 'pointer',
-              flexShrink: 0
+              flexShrink: 0,
+              minWidth: '100px',
+              opacity: 1,
+              visibility: 'visible'
             }}
+            data-button="cancel"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
             style={{
-              padding: '10px 16px',
+              padding: '10px 20px',
               borderRadius: 6,
               border: 'none',
               background: isDanger ? '#ef4444' : '#2563eb',
               color: 'white',
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: 'pointer',
-              flexShrink: 0
+              flexShrink: 0,
+              minWidth: '100px',
+              opacity: 1,
+              visibility: 'visible'
             }}
+            data-button="confirm"
           >
             {confirmText}
           </button>
