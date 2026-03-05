@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar } from './components/Calendar';
 import { ShiftModal } from './components/ShiftModal';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -9,7 +10,6 @@ import { useIndexedDB, useScheduleData } from './hooks/useIndexedDB';
 import { DEFAULT_SHIFT_COMBINATIONS } from './constants';
 import { AddToHomescreen } from './utils/addToHomescreen';
 import { Settings } from './types';
-import { DateNotes } from './types';
 import { gsap } from 'gsap';
 import StaffOnboard from './components/StaffOnboard';
 import StaffLogin from './components/StaffLogin';
@@ -83,7 +83,7 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
 
   // Use IndexedDB hooks
   const { schedule, specialDates, setSchedule, setSpecialDates } = useScheduleData();
-  const [dateNotes, setDateNotes] = useIndexedDB<DateNotes>('dateNotes', {});
+  const [dateNotes, setDateNotes] = useIndexedDB<Record<string, string>>('dateNotes', {});
   const [scheduleTitle, setScheduleTitle] = useIndexedDB<string>('scheduleTitle', 'Work Schedule', 'metadata');
   const [settings, setSettings] = useIndexedDB<Settings & { useManualMode?: boolean }>('workSettings', {
     basicSalary: 35000,
@@ -554,8 +554,8 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
         {renderTabContent()}
       </div>
       
-      {/* Modals and Popups */}
-      {showModal && selectedDate && (
+      {/* Modals and Popups - Rendered via Portal to avoid scroll issues */}
+      {showModal && selectedDate && typeof document !== 'undefined' && createPortal(
         <ShiftModal
           selectedDate={selectedDate}
           schedule={schedule}
@@ -571,7 +571,8 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
             }));
             setRefreshKey(prev => prev + 1);
           }}
-        />
+        />,
+        document.body
       )}
     </div>
   );
