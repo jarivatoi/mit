@@ -26,14 +26,22 @@
     
     <!-- Prevent white screen on startup -->
     <style>
-      /* Critical CSS to prevent white screen */
-      #root {
-        min-height: 100vh;
-        background: white !important;
+      /* Critical CSS to ensure white background from start */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
       
-      /* Ensure body and html are white from start */
       html, body {
+        min-height: 100vh;
+        background: white !important;
+        background-color: white !important;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      
+      #root {
+        min-height: 100vh;
         background: white !important;
         background-color: white !important;
       }
@@ -46,7 +54,6 @@
         min-height: 100vh;
         background: white !important;
         color: #374151;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         text-align: center;
         padding: 20px;
       }
@@ -114,7 +121,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="https://jarivatoi.github.io/mit/icon.png">
     <link rel="icon" type="image/png" sizes="512x512" href="https://jarivatoi.github.io/mit/icon.png">
   </head>
-  <body>
+  <body style="background: white !important; background-color: white !important;">
     <div id="root">
       <!-- Empty root - React will handle all loading -->
     </div>
