@@ -496,21 +496,92 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
           maxWidth: 400,
           padding: 20
         }}>
+          {/* GIF Splash Screen */}
           <div style={{
-            width: 80,
-            height: 80,
+            width: 200,
+            height: 200,
             margin: '0 auto 24px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            borderRadius: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 10px 30px -10px rgba(99, 102, 241, 0.3)'
+            borderRadius: '20px',
+            overflow: 'hidden'
           }}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-              <path d="M8 7V3M16 7V3M7 11H17M5 21H19C20.1046 21 21 20.1046 21 19V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V19C3 20.1046 3.89543 21 5 21Z" 
-                    stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            {/* Animated Logo with Pulse Effect */}
+            <div style={{
+              position: 'relative',
+              width: 120,
+              height: 120,
+              animation: 'pulse-bounce 1.5s ease-in-out infinite'
+            }}>
+              {/* Main logo container */}
+              <div style={{
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                borderRadius: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 20px 60px -20px rgba(99, 102, 241, 0.5)',
+                animation: 'gradient-shift 3s ease infinite',
+                backgroundSize: '200% 200%'
+              }}>
+                {/* Calendar Icon */}
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" style={{
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                }}>
+                  <path d="M8 7V3M16 7V3M7 11H17M5 21H19C20.1046 21 21 20.1046 21 19V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V19C3 20.1046 3.89543 21 5 21Z" 
+                        stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                
+                {/* Rotating ring around logo */}
+                <div style={{
+                  position: 'absolute',
+                  width: '140%',
+                  height: '140%',
+                  border: '3px solid transparent',
+                  borderTop: '3px solid rgba(255,255,255,0.3)',
+                  borderBottom: '3px solid rgba(255,255,255,0.3)',
+                  borderRadius: '50%',
+                  animation: 'spin 2s linear infinite'
+                }}></div>
+              </div>
+              
+              {/* Ripple effect */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                border: '2px solid rgba(99, 102, 241, 0.5)',
+                animation: 'ripple 1.5s ease-out infinite'
+              }}></div>
+            </div>
+            
+            {/* Add CSS animations */}
+            <style>{`
+              @keyframes pulse-bounce {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+              @keyframes ripple {
+                0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+                100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+              }
+              @keyframes gradient-shift {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+              }
+            `}</style>
           </div>
           
           <h1 style={{
