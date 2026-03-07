@@ -14,7 +14,7 @@ import { gsap } from 'gsap';
 import StaffOnboard from './components/StaffOnboard';
 import StaffLogin from './components/StaffLogin';
 import ProfileTab from './components/ProfileTab';
-import { saveUserSession, getUserSession, removeUserSession, saveLastUsedIdNumber, getLastUsedIdNumber } from './utils/indexedDB';
+import { saveUserSession, getUserSession, removeUserSession, saveLastUsedIdNumber, getLastUsedIdNumber, workScheduleDB } from './utils/indexedDB';
 
 type UserSession = { userId: string; idNumber: string; surname?: string; name?: string; isAdmin: boolean } | null
 type UserProfile = { id: string; idNumber: string; surname: string; name: string; isAdmin: boolean } | null
@@ -91,9 +91,39 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
     shiftCombinations: DEFAULT_SHIFT_COMBINATIONS,
     useManualMode: false // Add manual mode flag to settings
   });
-
+  
   // Add refreshKey state
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Force save on page close/refresh for Android reliability
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      // Modern browsers ignore custom messages but still trigger the event
+      e.preventDefault();
+      
+      // Synchronously save critical data before unload
+      try {
+        console.log('💾 Force saving data before unload...');
+        await workScheduleDB.init();
+        await Promise.all([
+          workScheduleDB.setSchedule(schedule),
+          workScheduleDB.setSpecialDates(specialDates)
+        ]);
+        console.log('✅ Data saved successfully before unload');
+      } catch (error) {
+        console.error('❌ Error saving before unload:', error);
+      }
+      
+      // Required for Chrome to show unload dialog
+      e.returnValue = '';
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [schedule, specialDates]);
 
   // Pass specialDates to the calculation hook with refreshKey dependency
   const { totalAmount, monthToDateAmount } = useScheduleCalculations(schedule, settings, specialDates, currentDate, refreshKey);
