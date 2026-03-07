@@ -17,9 +17,9 @@ const StaffOnboard: React.FC<{ onComplete?: (u: OnboardResult) => void; onBack?:
     return navigator.onLine
   }
 
-  // Helper function to capitalize surname (ALL CAPS)
+  // Helper function to capitalize surname (ALL CAPS, allows hyphens)
   const capitalizeSurname = (str: string): string => {
-    return str.toUpperCase().replace(/[^A-Z]/g, '');
+    return str.toUpperCase().replace(/[^A-Z-]/g, '');
   }
 
   // Helper function to capitalize name (first letter of each word)
