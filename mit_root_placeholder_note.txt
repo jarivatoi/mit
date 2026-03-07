@@ -1,1 +1,0 @@
-This patch is intended to be applied to root MIT layout. The actual patches follow and are designed to be pasted into a single root repository import. This is a note to help you align expectations when applying in one go.
