@@ -5,7 +5,7 @@ import { DEFAULT_SHIFT_COMBINATIONS } from '../constants';
 export function useIndexedDB<T>(
   key: string,
   initialValue: T,
-  storageType: 'setting' | 'metadata' = 'setting'
+  storageType: 'setting' | 'metadata' | 'dateNotes' = 'setting'
 ) {
   const [value, setValue] = useState<T>(initialValue);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,9 +20,16 @@ export function useIndexedDB<T>(
       
       await workScheduleDB.init();
       
-      const storedValue = storageType === 'setting' 
-        ? await workScheduleDB.getSetting<T>(key)
-        : await workScheduleDB.getMetadata<T>(key);
+      let storedValue: T | null;
+      
+      if (storageType === 'dateNotes') {
+        // Special handling for dateNotes
+        storedValue = await workScheduleDB.getDateNotes() as unknown as T;
+      } else {
+        storedValue = storageType === 'setting' 
+          ? await workScheduleDB.getSetting<T>(key)
+          : await workScheduleDB.getMetadata<T>(key);
+      }
       
       console.log(`📦 Retrieved ${storageType} "${key}":`, storedValue);
       
@@ -55,7 +62,10 @@ export function useIndexedDB<T>(
         // If no stored value, use the initial value and save it
         console.log(`🆕 No stored value for ${storageType} "${key}", using initial value:`, initialValue);
         setValue(initialValue);
-        if (storageType === 'setting') {
+        
+        if (storageType === 'dateNotes') {
+          await workScheduleDB.setDateNotes(initialValue as unknown as Record<string, string>);
+        } else if (storageType === 'setting') {
           await workScheduleDB.setSetting(key, initialValue);
         } else {
           await workScheduleDB.setMetadata(key, initialValue);
@@ -79,9 +89,11 @@ export function useIndexedDB<T>(
 
   // Update value and save to IndexedDB
   const updateValue = useCallback(async (newValue: T | ((prev: T) => T)) => {
+    let valueToStore: T = value; // Initialize with current value as fallback
+    
     try {
       setError(null);
-      const valueToStore = typeof newValue === 'function' 
+      valueToStore = typeof newValue === 'function' 
         ? (newValue as (prev: T) => T)(value) 
         : newValue;
       
@@ -91,7 +103,9 @@ export function useIndexedDB<T>(
       // Ensure database is initialized before saving
       await workScheduleDB.init();
       
-      if (storageType === 'setting') {
+      if (storageType === 'dateNotes') {
+        await workScheduleDB.setDateNotes(valueToStore as unknown as Record<string, string>);
+      } else if (storageType === 'setting') {
         await workScheduleDB.setSetting(key, valueToStore);
       } else {
         await workScheduleDB.setMetadata(key, valueToStore);
@@ -110,7 +124,9 @@ export function useIndexedDB<T>(
         console.log('🔄 Retrying save operation...');
         try {
           await new Promise(resolve => setTimeout(resolve, 500));
-          if (storageType === 'setting') {
+          if (storageType === 'dateNotes') {
+            await workScheduleDB.setDateNotes(valueToStore as unknown as Record<string, string>);
+          } else if (storageType === 'setting') {
             await workScheduleDB.setSetting(key, valueToStore);
           } else {
             await workScheduleDB.setMetadata(key, valueToStore);
@@ -168,9 +184,11 @@ export function useScheduleData() {
   }, [loadData]);
 
   const updateSchedule = useCallback(async (newSchedule: Record<string, string[]> | ((prev: Record<string, string[]>) => Record<string, string[]>)) => {
+    let scheduleToStore: Record<string, string[]> = schedule; // Initialize with current value
+    
     try {
       setError(null);
-      const scheduleToStore = typeof newSchedule === 'function' 
+      scheduleToStore = typeof newSchedule === 'function' 
         ? newSchedule(schedule) 
         : newSchedule;
       
@@ -184,8 +202,9 @@ export function useScheduleData() {
       await workScheduleDB.setSchedule(scheduleToStore);
       console.log('✅ Schedule data saved successfully');
       
-      // Add delay for iPhone persistence
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Enhanced delay for Android/iPhone persistence
+      // Modern Android devices have aggressive power management that can interrupt transactions
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
       
     } catch (err) {
       console.error('❌ Error saving schedule:', err);
@@ -223,8 +242,9 @@ export function useScheduleData() {
       await workScheduleDB.setSpecialDates(specialDatesToStore);
       console.log('✅ Special dates data saved successfully');
       
-      // Add delay for iPhone persistence
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Enhanced delay for Android/iPhone persistence
+      // Modern Android devices have aggressive power management that can interrupt transactions
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
       
     } catch (err) {
       console.error('❌ Error saving special dates:', err);
