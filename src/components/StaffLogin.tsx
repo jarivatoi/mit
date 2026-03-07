@@ -1,6 +1,145 @@
-import React, { useState, useEffect } from 'react' 
+import React, { useState, useEffect, useRef } from 'react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { saveLastUsedIdNumber, getLastUsedIdNumber } from '../utils/indexedDB';
+import { gsap } from 'gsap';
+import SplitText from '../utils/SplitText';
+
+// Animated Registration Button Component
+const AnimatedRegistrationButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const text1Ref = useRef<HTMLSpanElement>(null);
+  const text2Ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (text1Ref.current && text2Ref.current) {
+      SplitText.register(gsap);
+
+      // Create SplitText instances for both texts
+      const split1 = new SplitText(text1Ref.current, {
+        type: 'chars',
+        wordsClass: 'split-word',
+        charsClass: 'split-char'
+      });
+
+      const split2 = new SplitText(text2Ref.current, {
+        type: 'chars',
+        wordsClass: 'split-word',
+        charsClass: 'split-char'
+      });
+
+      // Set initial states - both texts start hidden off to the right
+      gsap.set(split1.chars, {
+        opacity: 0,
+        x: 50, // Start positioned to the right
+        y: 0,
+        scale: 1,
+        display: 'inline-block'
+      });
+
+      gsap.set(split2.chars, {
+        opacity: 0,
+        x: 50, // Start positioned to the right
+        y: 0,
+        scale: 1,
+        display: 'inline-block'
+      });
+
+      // Ensure only Registration is visible initially by making chars inline-block
+      gsap.set(split1.chars, {
+        opacity: 1,
+        x: 0,
+        display: 'inline-block'
+      });
+
+      // Create timeline for seamless loop
+      const tl = gsap.timeline({
+        repeat: -1,
+        repeatDelay: 0.5
+      });
+
+      // Animate "Registration" in - slide from right to left
+      tl.to(split1.chars, {
+        opacity: 1,
+        x: 0, // Slide to original position from right
+        duration: 0.5,
+        stagger: 0.03,
+        ease: 'power2.out'
+      });
+
+      // Hold for a moment
+      tl.to({}, { duration: 0.5 });
+
+      // Animate "Registration" out - fade out (stay in place)
+      tl.to(split1.chars, {
+        opacity: 0,
+        duration: 0.5,
+        stagger: 0.03,
+        ease: 'power2.in'
+      });
+
+      // Animate "First Time Users Only" in - slide from right to left
+      tl.to(split2.chars, {
+        opacity: 1,
+        x: 0, // Slide to original position from right
+        duration: 0.5,
+        stagger: 0.03,
+        ease: 'power2.out'
+      }, '-=0.4');
+
+      // Hold for a moment
+      tl.to({}, { duration: 0.5 });
+
+      // Animate "First Time Users Only" out - fade out (stay in place)
+      tl.to(split2.chars, {
+        opacity: 0,
+        duration: 0.7,
+        stagger: 0.03,
+        ease: 'power2.in'
+      });
+
+      // Reset Registration to starting position (off-screen right) while First Time Users Only is fading out
+      tl.set(split1.chars, {
+        x: 50,
+        opacity: 0
+      }, '-=0.4');
+
+      // Loop back to Registration sliding in from right
+      tl.to(split1.chars, {
+        opacity: 1,
+        x: 0, // Slide to original position from right
+        duration: 0.5,
+        stagger: 0.03,
+        ease: 'power2.out'
+      }, '-=0.4');
+
+      return () => {
+        split1.revert();
+        split2.revert();
+        tl.kill();
+      };
+    }
+  }, []);
+
+  return (
+    <button
+      ref={buttonRef}
+      onClick={onClick}
+      style={{
+        ...buttonStyle,
+        background: '#10b981',
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      <span ref={text1Ref} style={{ display: 'block', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>Registration</span>
+      <span ref={text2Ref} style={{ display: 'block', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>First Time Users Only</span>
+    </button>
+  );
+}
 
 type StaffLoginProps = {
   onLoginSuccess: (session: { userId: string; idNumber: string; isAdmin: boolean; surname?: string; name?: string }) => void
@@ -16,6 +155,7 @@ const hash = async (input: string) => {
 }
 
 const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, showIdField = true }) => {
+  const headerRef = useRef<HTMLHeadingElement>(null);
   // Try to get the last used ID number from IndexedDB to pre-fill
   const [idNumber, setIdNumber] = useState('');
   
@@ -37,6 +177,59 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     };
     
     loadLastId();
+  }, []);
+
+  // GSAP SplitText wave zoom animation for "Staff Sign In" header
+  useEffect(() => {
+    if (headerRef.current) {
+      // Register SplitText with GSAP core
+      SplitText.register(gsap);
+      
+      // Create SplitText instance
+      const split = new SplitText(headerRef.current, {
+        type: 'chars',
+        wordsClass: 'split-word',
+        charsClass: 'split-char'
+      });
+      
+      // Set initial state of all characters - hidden and scaled down
+      gsap.set(split.chars, {
+        opacity: 0,
+        scale: 0.5,
+        y: 50,
+        rotationX: -90,
+        transformOrigin: 'center center -50',
+        display: 'inline-block'
+      });
+      
+      // Apply gradient to each character
+      split.chars.forEach(char => {
+        char.style.background = 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
+        char.style.backgroundClip = 'text';
+        char.style.webkitBackgroundClip = 'text';
+        char.style.webkitTextFillColor = 'transparent';
+      });
+      
+      // Animate characters in with wave effect
+      gsap.to(split.chars, {
+        opacity: 1,
+        scale: 1,
+        y: 0,
+        rotationX: 0,
+        duration: 0.6,
+        stagger: 0.08,
+        ease: 'back.out(1.7)',
+        repeat: -1,
+        yoyo: true,
+        repeatDelay: 1.5,
+        transformOrigin: 'center center'
+      });
+      
+      return () => {
+        // Cleanup on unmount
+        split.revert();
+      };
+    }
   }, []);
   const [passcode, setPasscode] = useState('')
   const [showPasscode, setShowPasscode] = useState(false)
@@ -360,7 +553,28 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
       <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
-        <h2 style={{ textAlign: 'center' }}>Staff Sign In</h2>
+        {/* Animated Staff Sign In Header with GSAP */}
+        <h2 
+          ref={headerRef}
+          style={{ 
+            textAlign: 'center',
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            backgroundSize: '200% auto',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            fontSize: '28px',
+            fontWeight: '700',
+            margin: '0 0 12px 0',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none',
+            display: 'inline-block'
+          }}
+        >
+          Staff Sign In
+        </h2>
         {showIdField !== false && (
           <input 
             placeholder="ID Number" 
@@ -413,7 +627,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
         <button type="submit" style={buttonStyle}>Login</button>
       </form>
       <div style={{ display: 'grid', gap: '8px', width: '100%', maxWidth: 420, marginTop: '16px' }}>
-        <button type="button" onClick={() => onRegister && onRegister()} style={{ ...buttonStyle, background: '#10b981' }}>Registration</button>
+        <AnimatedRegistrationButton onClick={() => onRegister && onRegister()} />
         <button type="button" onClick={() => {
           console.log('Forgot Passcode button clicked');
           setError(null); // Clear any existing error when navigating to forgot passcode
@@ -431,4 +645,5 @@ const buttonStyle: React.CSSProperties = {
   padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none'
 }
 
+// Character-by-character slide reveal animation for Registration button
 export default StaffLogin
