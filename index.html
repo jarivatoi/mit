@@ -24,7 +24,7 @@
     <meta name="description" content="Professional work schedule management with offline support by NARAYYA" />
     <meta name="application-name" content="MIT Roster" />
     
-    <!-- Prevent white screen on startup -->
+    <!-- Prevent white/black screen on startup -->
     <style>
       /* Critical CSS to ensure white background from start */
       * {
@@ -38,6 +38,7 @@
         background: white !important;
         background-color: white !important;
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        overflow-x: hidden;
       }
       
       #root {
@@ -86,6 +87,19 @@
         100% { transform: rotate(360deg); }
       }
     </style>
+    
+    <!-- Inline script to set background immediately -->
+    <script>
+      // Set white background immediately before any rendering
+      document.documentElement.style.background = 'white';
+      document.documentElement.style.backgroundColor = 'white';
+      document.body.style.background = 'white';
+      document.body.style.backgroundColor = 'white';
+      if (document.getElementById('root')) {
+        document.getElementById('root').style.background = 'white';
+        document.getElementById('root').style.backgroundColor = 'white';
+      }
+    </script>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="/mit/manifest.json">
