@@ -156,6 +156,8 @@ const hash = async (input: string) => {
 
 const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, showIdField = true }) => {
   const headerRef = useRef<HTMLHeadingElement>(null);
+  const animationTriggerRef = useRef(0); // Track animation trigger count
+
   // Try to get the last used ID number from IndexedDB to pre-fill
   const [idNumber, setIdNumber] = useState('');
   
@@ -179,6 +181,17 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     loadLastId();
   }, []);
 
+  const [passcode, setPasscode] = useState('')
+  const [showPasscode, setShowPasscode] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showForgotPasscode, setShowForgotPasscode] = useState(false)
+  const [tempIdNumber, setTempIdNumber] = useState('')
+  const [idVerified, setIdVerified] = useState(false)
+  const [newPasscode, setNewPasscode] = useState('')
+  const [confirmPasscode, setConfirmPasscode] = useState('')
+  const [showNewPasscode, setShowNewPasscode] = useState(false)
+  const [showConfirmPasscode, setShowConfirmPasscode] = useState(false)
+
   // GSAP SplitText wave zoom animation for "Staff Sign In" header
   useEffect(() => {
     if (headerRef.current) {
@@ -196,7 +209,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
       gsap.set(split.chars, {
         opacity: 0,
         scale: 0.5,
-        y: 50,
+        y: -150,
         rotationX: -90,
         transformOrigin: 'center center -50',
         display: 'inline-block'
@@ -210,8 +223,14 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
         char.style.webkitTextFillColor = 'transparent';
       });
       
-      // Animate characters in with wave effect
-      gsap.to(split.chars, {
+      // Create timeline for entrance and exit animation
+      const tl = gsap.timeline({
+        repeat: -1,
+        repeatDelay: 1.5
+      });
+      
+      // Animate characters IN - drop down from top
+      tl.to(split.chars, {
         opacity: 1,
         scale: 1,
         y: 0,
@@ -219,28 +238,40 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
         duration: 0.6,
         stagger: 0.08,
         ease: 'back.out(1.7)',
-        repeat: -1,
-        yoyo: true,
-        repeatDelay: 1.5,
         transformOrigin: 'center center'
       });
       
+      // Hold for a moment
+      tl.to({}, { duration: 1.5 });
+      
+      // Animate characters OUT - starting from last character, moving downward
+      tl.to(split.chars, {
+        opacity: 0,
+        scale: 0.5,
+        y: 50, // Move downward toward ID number field
+        rotationX: -90,
+        duration: 0.4,
+        stagger: {
+          amount: 0.3,
+          from: 'end' // Start from last character
+        },
+        ease: 'back.in(1.7)',
+        transformOrigin: 'center center'
+      });
+      
+      // Reset to starting position while invisible
+      tl.set(split.chars, {
+        y: -100,
+        rotationX: -90,
+        scale: 0.5
+      });
+
       return () => {
-        // Cleanup on unmount
+        // Cleanup on unmount or dependency change
         split.revert();
       };
     }
-  }, []);
-  const [passcode, setPasscode] = useState('')
-  const [showPasscode, setShowPasscode] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showForgotPasscode, setShowForgotPasscode] = useState(false)
-  const [tempIdNumber, setTempIdNumber] = useState('')
-  const [idVerified, setIdVerified] = useState(false)
-  const [newPasscode, setNewPasscode] = useState('')
-  const [confirmPasscode, setConfirmPasscode] = useState('')
-  const [showNewPasscode, setShowNewPasscode] = useState(false)
-  const [showConfirmPasscode, setShowConfirmPasscode] = useState(false)
+  }, [showForgotPasscode]); // Re-run animation when forgot passcode state changes
 
   // Check if user is online
   const checkOnlineStatus = (): boolean => {
