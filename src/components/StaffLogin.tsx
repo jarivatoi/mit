@@ -209,7 +209,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
       gsap.set(split.chars, {
         opacity: 0,
         scale: 0.5,
-        y: -150,
+        y: -100,
         rotationX: -90,
         transformOrigin: 'center center -50',
         display: 'inline-block'
@@ -501,7 +501,14 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
             />
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
             <button onClick={handleForgotPasscode} style={buttonStyle}>Verify ID</button>
-            <button type="button" onClick={() => {setShowForgotPasscode(false); setTempIdNumber(''); setIdVerified(false); setError(null); setPasscode('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
+            <button type="button" onClick={() => {
+              setShowForgotPasscode(false); 
+              setTempIdNumber(''); 
+              setIdVerified(false); 
+              setError(null); 
+              setPasscode('');
+              window.scrollTo(0, 0); // Reset scroll to top
+            }} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
           </div>
         </div>
       )
@@ -574,7 +581,16 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
             </div>
             {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
             <button onClick={handleUpdatePasscode} style={buttonStyle}>Update Passcode</button>
-            <button type="button" onClick={() => {setShowForgotPasscode(false); setNewPasscode(''); setConfirmPasscode(''); setTempIdNumber(''); setIdVerified(false); setError(null); setPasscode('');}} style={{ ...buttonStyle, background: '#6b7280' }}>Cancel</button>
+            <button type="button" onClick={() => {
+              setShowForgotPasscode(false); 
+              setNewPasscode(''); 
+              setConfirmPasscode(''); 
+              setTempIdNumber(''); 
+              setIdVerified(false); 
+              setError(null); 
+              setPasscode('');
+              window.scrollTo(0, 0); // Reset scroll to top
+            }} style={{ ...buttonStyle, background: '#6b7280' }}>Cancel</button>
           </div>
         </div>
       )
