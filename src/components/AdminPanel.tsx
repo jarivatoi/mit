@@ -163,7 +163,12 @@ const AdminPanel: React.FC = () => {
         minHeight: 0, // Critical for nested scrollable content
         overflow: 'hidden'
       }}>
-        <strong style={{ marginBottom: 6 }}>Staff Directory</strong>
+        <strong style={{ 
+          marginBottom: 6, 
+          textAlign: 'center',
+          display: 'block',
+          width: '100%'
+        }}>Staff Directory</strong>
         {loading ? (
           <div style={{ padding: 12, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
         ) : (
@@ -184,16 +189,31 @@ const AdminPanel: React.FC = () => {
                 flexDirection: 'column', 
                 padding: '12px 16px', 
                 borderBottom: '1px solid #e5e7eb',
-                position: 'relative'
+                position: 'relative',
+                userSelect: 'none',
+                WebkitUserSelect: 'none'
               }}>
                 {/* Staff name - Line 1 */}
-                <div style={{ fontSize: '14px', fontWeight: 500, color: '#1f2937', marginBottom: '4px' }}>
+                <div style={{ 
+                  fontSize: '14px', 
+                  fontWeight: 500, 
+                  color: '#1f2937', 
+                  marginBottom: '4px',
+                  userSelect: 'text',
+                  WebkitUserSelect: 'text'
+                }}>
                   {s.name} {s.surname}
                 </div>
                 
                 {/* ID Number - Line 2 */}
-                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
-                  ID number ({s.id_number})
+                <div style={{ 
+                  fontSize: '13px', 
+                  color: '#6b7280', 
+                  marginBottom: '4px',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none'
+                }}>
+                  ID number (<span style={{ userSelect: 'text', WebkitUserSelect: 'text' }}>{s.id_number}</span>)
                 </div>
                 
                 {/* Last Login - Line 3 */}
@@ -232,7 +252,9 @@ const AdminPanel: React.FC = () => {
                       fontSize: '12px',
                       fontWeight: 500,
                       cursor: 'pointer',
-                      marginLeft: 'auto'
+                      marginLeft: 'auto',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none'
                     }}
                     title={`Delete ${s.name} ${s.surname}`}
                   >
