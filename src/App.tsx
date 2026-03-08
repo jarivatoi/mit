@@ -23,6 +23,7 @@ type UserProfile = { id: string; idNumber: string; surname: string; name: string
 const App: React.FC = () => {
   const [phase, setPhase] = useState<'onboard'|'login'|'main'|null>(null)
   const [user, setUser] = useState<UserSession>(null)
+  const [loginKey, setLoginKey] = useState(0) // Key to force re-mount of StaffLogin
 
   // Initialize phase on load
   useEffect(() => {
@@ -58,10 +59,13 @@ const App: React.FC = () => {
   }
 
   if (phase === 'onboard') {
-    return <StaffOnboard onComplete={onOnboardComplete} onBack={() => setPhase('login')} />
+    return <StaffOnboard onComplete={onOnboardComplete} onBack={() => {
+      setPhase('login');
+      setLoginKey(prev => prev + 1); // Force re-mount animation
+    }} />
   }
   if (phase === 'login') {
-    return <StaffLogin onLoginSuccess={onLoginSuccess} onRegister={() => setPhase('onboard')} showIdField={true} />
+    return <StaffLogin key={loginKey} onLoginSuccess={onLoginSuccess} onRegister={() => setPhase('onboard')} showIdField={true} />
   }
 
   // Main app after authentication
