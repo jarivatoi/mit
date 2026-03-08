@@ -24,6 +24,7 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
   const [error, setError] = useState<string | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showBackButton, setShowBackButton] = useState(false)
 
   // Check if user is online
   const checkOnlineStatus = (): boolean => {
@@ -61,6 +62,11 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
     }
     fetchMe()
   }, [user?.id])
+
+  // Helper function to capitalize surname (ALL CAPS, allows hyphens)
+  const capitalizeSurname = (str: string): string => {
+    return str.toUpperCase().replace(/[^A-Z-]/g, '');
+  };
 
   const save = async () => {
     if (!user?.id) return
@@ -412,12 +418,25 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
         <>
           <h3 style={{ marginBottom: 12 }}>Profile</h3>
           <div style={{ display: 'grid', gap: 12, maxWidth: 480 }}>
-            <input value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" style={inputStyle} />
+            <input value={surname} onChange={e => setSurname(capitalizeSurname(e.target.value))} placeholder="Surname" style={inputStyle} />
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" style={inputStyle} />
             <input value={idNumber} readOnly placeholder="ID Number" style={{ ...inputStyle, backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
             <button onClick={save} style={buttonStyle}>Save Profile</button>
             <button onClick={changePasscode} style={{ ...buttonStyle, background: '#f59e0b', marginTop: 12 }}>Change Passcode</button>
             <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
+            <button 
+              onClick={() => { 
+                localStorage.removeItem('staff_session');
+                localStorage.removeItem('staff_onboarded');
+                localStorage.removeItem('staff_first_run_complete');
+                localStorage.removeItem('staff_needs_login');
+                localStorage.removeItem('last_used_id_number');
+                window.location.reload();
+              }} 
+              style={{ ...buttonStyle, background: '#6b7280', marginTop: 12 }}
+            >
+              Back to Login
+            </button>
           </div>
           {error && <div style={{ color: 'red', marginTop: 12, textAlign: 'center' }}>{error}</div>}
           
