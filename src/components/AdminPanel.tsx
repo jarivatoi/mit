@@ -152,6 +152,31 @@ const AdminPanel: React.FC = () => {
       minHeight: '400px'
     }}>
       <h3 style={{ marginBottom: 12, flexShrink: 0 }}>Admin Panel</h3>
+      <button 
+        onClick={() => { 
+          localStorage.removeItem('staff_session');
+          localStorage.removeItem('staff_onboarded');
+          localStorage.removeItem('staff_first_run_complete');
+          localStorage.removeItem('staff_needs_login');
+          localStorage.removeItem('last_used_id_number');
+          window.location.reload();
+        }} 
+        style={{ 
+          padding: '12px 14px', 
+          borderRadius: 8, 
+          border: 'none', 
+          background: '#6b7280', 
+          color: 'white', 
+          fontWeight: 600, 
+          cursor: 'pointer', 
+          userSelect: 'none', 
+          WebkitUserSelect: 'none',
+          marginBottom: 12,
+          flexShrink: 0
+        }}
+      >
+        Back to Login
+      </button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0 }}>
         <span>Login enabled</span>
         <input type="checkbox" checked={loginEnabled} onChange={toggleLogin} />
