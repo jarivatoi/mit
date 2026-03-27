@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/mit/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>X-ray MIT - Work Schedule Manager</title>
+    
+    <!-- PWA Meta Tags for Modern Android -->
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MIT Roster" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- PWA Manifest Link -->
+    <link rel="manifest" href="/mit/manifest.json" />
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="192x192" href="/mit/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/mit/icon-512.png" />
+    
+    <!-- Description for SEO -->
+    <meta name="description" content="Professional work schedule management with offline support by NARAYYA" />
+    <meta name="application-name" content="MIT Roster" />
+    
+    <!-- Prevent white screen on startup -->
+    <style>
+      /* Critical CSS to prevent white screen */
+      #root {
+        min-height: 100vh;
+        background: white !important;
+      }
+      
+      /* Ensure body and html are white from start */
+      html, body {
+        background: white !important;
+        background-color: white !important;
+      }
+      
+      /* Loading screen styles */
+      .app-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: white !important;
+        color: #374151;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        text-align: center;
+        padding: 20px;
+      }
+      
+      .loading-content h1 {
+        font-size: 24px;
+        margin-bottom: 20px;
+        font-weight: 600;
+        color: #1f2937;
+      }
+      
+      .loading-content p {
+        font-size: 16px;
+        margin-bottom: 30px;
+        color: #6b7280;
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(99, 102, 241, 0.3);
+        border-top: 4px solid #6366f1;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+    <script type="module" crossorigin src="/mit/assets/index-D40ezqkJ.js"></script>
+    <link rel="stylesheet" crossorigin href="/mit/assets/index-I40OCjZJ.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
