@@ -25,6 +25,7 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showBackButton, setShowBackButton] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Check if user is online
   const checkOnlineStatus = (): boolean => {
@@ -52,12 +53,26 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
 
   useEffect(() => {
     const fetchMe = async () => {
-      if (!user?.id) return
-      const { data, error } = await supabase.from('staff_users').select('*').eq('id', user.id).single()
-      if (!error && data) {
-        setSurname(data.surname || '')
-        setName(data.name || '')
-        setIdNumber(data.id_number || '')
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+      try {
+        setIsLoading(true)
+        const { data, error } = await supabase.from('staff_users').select('*').eq('id', user.id).single()
+        if (!error && data) {
+          setSurname(data.surname || '')
+          setName(data.name || '')
+          setIdNumber(data.id_number || '')
+        } else if (error) {
+          console.error('Error fetching profile:', error)
+          setError('Failed to load profile data. Please try again.')
+        }
+      } catch (err) {
+        console.error('Error fetching profile:', err)
+        setError('Failed to load profile data. Please check your connection.')
+      } finally {
+        setIsLoading(false)
       }
     }
     fetchMe()
@@ -417,27 +432,59 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
         // Regular users see profile form
         <>
           <h3 style={{ marginBottom: 12, textAlign: 'center' }}>Profile</h3>
-          <div style={{ display: 'grid', gap: 12, maxWidth: 480, margin: '0 auto' }}>
-            <input value={surname} onChange={e => setSurname(capitalizeSurname(e.target.value))} placeholder="Surname" style={inputStyle} />
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" style={inputStyle} />
-            <input value={idNumber} readOnly placeholder="ID Number" style={{ ...inputStyle, backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
-            <button onClick={save} style={buttonStyle}>Save Profile</button>
-            <button onClick={changePasscode} style={{ ...buttonStyle, background: '#f59e0b', marginTop: 12 }}>Change Passcode</button>
-            <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
-            <button 
-              onClick={() => { 
-                localStorage.removeItem('staff_session');
-                localStorage.removeItem('staff_onboarded');
-                localStorage.removeItem('staff_first_run_complete');
-                localStorage.removeItem('staff_needs_login');
-                localStorage.removeItem('last_used_id_number');
-                window.location.reload();
-              }} 
-              style={{ ...buttonStyle, background: '#6b7280', marginTop: 12 }}
-            >
-              Back to Login
-            </button>
-          </div>
+          {isLoading ? (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center',
+              minHeight: '300px',
+              gap: '16px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                border: '4px solid rgba(99, 102, 241, 0.3)',
+                borderTop: '4px solid #6366f1',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading profile...</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12, maxWidth: 480, margin: '0 auto' }}>
+              <input value={surname} onChange={e => setSurname(capitalizeSurname(e.target.value))} placeholder="Surname" style={inputStyle} />
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" style={inputStyle} />
+              <input value={idNumber} readOnly placeholder="ID Number" style={{ ...inputStyle, backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
+              <button onClick={save} style={buttonStyle}>Save Profile</button>
+              <button onClick={changePasscode} style={{ ...buttonStyle, background: '#f59e0b', marginTop: 12 }}>Change Passcode</button>
+              <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
+              <button 
+                onClick={async () => { 
+                  // Save any pending data first
+                  try {
+                    const { workScheduleDB } = await import('../utils/indexedDB');
+                    await workScheduleDB.init();
+                  } catch (error) {
+                    console.warn('Error initializing DB before logout:', error);
+                  }
+                  
+                  // Clear all session data
+                  localStorage.removeItem('staff_session');
+                  localStorage.removeItem('staff_onboarded');
+                  localStorage.removeItem('staff_first_run_complete');
+                  localStorage.removeItem('staff_needs_login');
+                  localStorage.removeItem('last_used_id_number');
+                  
+                  // Force reload without triggering beforeunload warning
+                  window.location.href = window.location.origin + window.location.pathname;
+                }} 
+                style={{ ...buttonStyle, background: '#6b7280', marginTop: 12 }}
+              >
+                Back to Login
+              </button>
+            </div>
+          )}
           {error && <div style={{ color: 'red', marginTop: 12, textAlign: 'center' }}>{error}</div>}
           
           {/* Save Confirmation Modal */}
