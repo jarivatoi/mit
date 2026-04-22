@@ -1,11 +1,11 @@
 // Define constants here since they're not exported from useIndexedDB
 const DB_NAME = 'WorkScheduleDB';
+const DB_VERSION = 1;
 
-// Initialize IndexedDB database with version upgrade
+// Initialize IndexedDB database
 export const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
-    // Open with version 5 to trigger upgrade and create missing stores
-    const request = indexedDB.open(DB_NAME, 5);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
       reject(request.error);
@@ -45,180 +45,112 @@ export const initDB = (): Promise<IDBDatabase> => {
 
 // Get user session from IndexedDB
 export const getUserSession = async (): Promise<any> => {
-  try {
-    const db = await initDB();
-    
-    // Check if userSession store exists
-    if (!db.objectStoreNames.contains('userSession')) {
-      console.warn('userSession object store not found in IndexedDB');
-      return null;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['userSession'], 'readonly');
-      const store = transaction.objectStore('userSession');
-      const request = store.get('staff_session');
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['userSession'], 'readonly');
+    const store = transaction.objectStore('userSession');
+    const request = store.get('staff_session');
 
-      request.onsuccess = () => {
-        const result = request.result;
-        resolve(result ? result.value : null);
-      };
+    request.onsuccess = () => {
+      const result = request.result;
+      resolve(result ? result.value : null);
+    };
 
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.warn('Error accessing userSession store:', error);
-    return null;
-  }
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
 };
 
 // Save user session to IndexedDB
 export const saveUserSession = async (session: any): Promise<void> => {
-  try {
-    const db = await initDB();
-    
-    // Check if userSession store exists
-    if (!db.objectStoreNames.contains('userSession')) {
-      console.warn('userSession object store not found in IndexedDB, cannot save session');
-      return;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['userSession'], 'readwrite');
-      const store = transaction.objectStore('userSession');
-      const request = store.put({ key: 'staff_session', value: session });
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['userSession'], 'readwrite');
+    const store = transaction.objectStore('userSession');
+    const request = store.put({ key: 'staff_session', value: session });
 
-      request.onsuccess = () => {
-        resolve();
-      };
+    request.onsuccess = () => {
+      resolve();
+    };
 
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.warn('Error saving user session:', error);
-  }
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
 };
 
 // Remove user session from IndexedDB
 export const removeUserSession = async (): Promise<void> => {
-  try {
-    const db = await initDB();
-    
-    // Check if userSession store exists
-    if (!db.objectStoreNames.contains('userSession')) {
-      console.warn('userSession object store not found in IndexedDB');
-      return;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['userSession'], 'readwrite');
-      const store = transaction.objectStore('userSession');
-      const request = store.delete('staff_session');
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['userSession'], 'readwrite');
+    const store = transaction.objectStore('userSession');
+    const request = store.delete('staff_session');
 
-      request.onsuccess = () => {
-        resolve();
-      };
+    request.onsuccess = () => {
+      resolve();
+    };
 
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.warn('Error removing user session:', error);
-  }
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
 };
 
 // Get last used ID number from IndexedDB
 export const getLastUsedIdNumber = async (): Promise<string | null> => {
-  try {
-    const db = await initDB();
-    
-    // Check if userSession store exists
-    if (!db.objectStoreNames.contains('userSession')) {
-      console.warn('userSession object store not found in IndexedDB');
-      return null;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['userSession'], 'readonly');
-      const store = transaction.objectStore('userSession');
-      const request = store.get('last_used_id_number');
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['userSession'], 'readonly');
+    const store = transaction.objectStore('userSession');
+    const request = store.get('last_used_id_number');
 
-      request.onsuccess = () => {
-        const result = request.result;
-        resolve(result ? result.value : null);
-      };
+    request.onsuccess = () => {
+      const result = request.result;
+      resolve(result ? result.value : null);
+    };
 
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.warn('Error accessing userSession store:', error);
-    return null;
-  }
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
 };
 
 // Save last used ID number to IndexedDB
 export const saveLastUsedIdNumber = async (idNumber: string): Promise<void> => {
-  try {
-    const db = await initDB();
-    
-    // Check if userSession store exists
-    if (!db.objectStoreNames.contains('userSession')) {
-      console.warn('userSession object store not found in IndexedDB, cannot save ID');
-      return;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['userSession'], 'readwrite');
-      const store = transaction.objectStore('userSession');
-      const request = store.put({ key: 'last_used_id_number', value: idNumber });
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['userSession'], 'readwrite');
+    const store = transaction.objectStore('userSession');
+    const request = store.put({ key: 'last_used_id_number', value: idNumber });
 
-      request.onsuccess = () => {
-        resolve();
-      };
+    request.onsuccess = () => {
+      resolve();
+    };
 
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.warn('Error saving last used ID number:', error);
-  }
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
 };
 
 // Remove last used ID number from IndexedDB
 export const removeLastUsedIdNumber = async (): Promise<void> => {
-  try {
-    const db = await initDB();
-    
-    // Check if userSession store exists
-    if (!db.objectStoreNames.contains('userSession')) {
-      console.warn('userSession object store not found in IndexedDB');
-      return;
-    }
-    
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['userSession'], 'readwrite');
-      const store = transaction.objectStore('userSession');
-      const request = store.delete('last_used_id_number');
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['userSession'], 'readwrite');
+    const store = transaction.objectStore('userSession');
+    const request = store.delete('last_used_id_number');
 
-      request.onsuccess = () => {
-        resolve();
-      };
+    request.onsuccess = () => {
+      resolve();
+    };
 
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.warn('Error removing last used ID number:', error);
-  }
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
 };
 
 // Define the workScheduleDB object that provides the methods used by hooks

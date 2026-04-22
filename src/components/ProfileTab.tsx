@@ -425,24 +425,13 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
             <button onClick={changePasscode} style={{ ...buttonStyle, background: '#f59e0b', marginTop: 12 }}>Change Passcode</button>
             <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
             <button 
-              onClick={async () => { 
-                // Save any pending data first
-                try {
-                  const { workScheduleDB } = await import('../utils/indexedDB');
-                  await workScheduleDB.init();
-                } catch (error) {
-                  console.warn('Error initializing DB before logout:', error);
-                }
-                
-                // Clear all session data
+              onClick={() => { 
                 localStorage.removeItem('staff_session');
                 localStorage.removeItem('staff_onboarded');
                 localStorage.removeItem('staff_first_run_complete');
                 localStorage.removeItem('staff_needs_login');
                 localStorage.removeItem('last_used_id_number');
-                
-                // Force reload without triggering beforeunload warning
-                window.location.href = window.location.origin + window.location.pathname;
+                window.location.reload();
               }} 
               style={{ ...buttonStyle, background: '#6b7280', marginTop: 12 }}
             >

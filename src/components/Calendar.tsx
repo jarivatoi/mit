@@ -1641,7 +1641,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       )}
 
       {/* Custom CSS for today's circle animation */}
-      <style>{`
+      <style jsx>{`
         @keyframes todayPulse {
           0%, 100% {
             transform: scale(1);

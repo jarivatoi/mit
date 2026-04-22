@@ -27,7 +27,7 @@ const App: React.FC = () => {
 
   // Initialize phase on load
   useEffect(() => {
-    // Always start with login screen - session is not persisted
+    // Always start with login screen - no session persistence
     setPhase('login');
   }, [])
 
@@ -47,14 +47,7 @@ const App: React.FC = () => {
   }
 
   const onLoginSuccess = async (sess: { userId: string; idNumber: string; isAdmin: boolean; surname?: string; name?: string }) => {
-    // Save only the ID number for pre-fill on next login (not full session)
-    try {
-      await saveLastUsedIdNumber(sess.idNumber);
-      console.log('✅ ID number saved for pre-fill:', sess.idNumber);
-    } catch (error) {
-      console.warn('❌ Failed to save ID number:', error);
-    }
-    
+    // Don't save session - require login on every refresh
     setUser({ 
       userId: sess.userId, 
       idNumber: sess.idNumber, 
@@ -136,8 +129,8 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
         console.error('❌ Error saving before unload:', error);
       }
       
-      // Disabled - prevents annoying browser warning on every refresh
-      // Browsers will show their own warning if there's actual unsaved work
+      // Required for Chrome to show unload dialog
+      e.returnValue = '';
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
