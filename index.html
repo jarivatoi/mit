@@ -79,10 +79,60 @@
         100% { transform: rotate(360deg); }
       }
     </style>
-    <script type="module" crossorigin src="/mit/assets/index-D40ezqkJ.js"></script>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/mit/manifest.json">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="X-ray MIT">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    
+    <!-- iPhone fullscreen support -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-touch-fullscreen" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <!-- Additional iPhone status bar control -->
+    <meta name="msapplication-navbutton-color" content="#000000">
+    <meta name="msapplication-TileColor" content="#000000">
+    
+    <!-- Prevent white bars and ensure full coverage -->
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    
+    <!-- Prevent automatic network requests and caching -->
+    
+    <!-- PWA Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="https://jarivatoi.github.io/mit/icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="https://jarivatoi.github.io/mit/icon.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="https://jarivatoi.github.io/mit/icon.png">
+    <link rel="apple-touch-icon" href="https://jarivatoi.github.io/mit/icon.png">
+    <link rel="icon" type="image/png" href="https://jarivatoi.github.io/mit/icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="https://jarivatoi.github.io/mit/icon.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="https://jarivatoi.github.io/mit/icon.png">
+    <script type="module" crossorigin src="/mit/assets/index-BjfkN1AQ.js"></script>
     <link rel="stylesheet" crossorigin href="/mit/assets/index-I40OCjZJ.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Empty root - React will handle all loading -->
+    </div>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      // Service worker registration is now handled by updateManager.ts
+      console.log('Service worker will be registered by UpdateManager');
+      
+      // Prevent iOS Safari from showing white screen
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+          // Page was loaded from cache, ensure React app is running
+          console.log('Page loaded from cache');
+        }
+      });
+    </script>
   </body>
 </html>
