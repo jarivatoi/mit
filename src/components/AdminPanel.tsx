@@ -33,29 +33,47 @@ const AdminPanel: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true)
-    const { data, error } = await supabase.from('staff_users').select('id, surname, name, id_number, last_login, is_admin, is_active, passcode_hash').order('last_login', { ascending: false })
-    if (!error && data) setStaff(data)
+    try {
+      const { data, error } = await supabase.from('staff_users').select('id, surname, name, id_number, last_login, is_admin, is_active, passcode_hash').order('last_login', { ascending: false })
+      if (error) {
+        console.error('Error fetching staff:', error)
+      } else if (data) {
+        setStaff(data)
+      }
+    } catch (err) {
+      console.error('Error fetching staff:', err)
+    }
     
     // Fetch the login enabled setting using admin client (bypasses RLS)
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'login_enabled')
-      .single()
-    
-    if (settingsError) {
-      console.log('Login enabled setting not found or error occurred:', settingsError.message)
-      setLoginEnabled(true) // Default to true if setting doesn't exist
-    } else if (settings?.value !== undefined && settings?.value !== null) {
-      // Handle both string and boolean values from database
-      const parsedValue = typeof settings.value === 'string' 
-        ? settings.value.toLowerCase() === 'true'
-        : Boolean(settings.value)
-      setLoginEnabled(parsedValue)
-      console.log('📊 Loaded login enabled setting:', parsedValue)
-    } else {
-      console.log('Login enabled setting has null/undefined value, defaulting to true')
+    if (!supabaseAdmin) {
+      console.warn('Admin client not available - cannot fetch system settings')
       setLoginEnabled(true)
+    } else {
+      try {
+        const { data: settings, error: settingsError } = await supabaseAdmin
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'login_enabled')
+          .single()
+        
+        if (settingsError) {
+          console.log('Login enabled setting not found or error occurred:', settingsError.message)
+          setLoginEnabled(true) // Default to true if setting doesn't exist
+        } else if (settings?.value !== undefined && settings?.value !== null) {
+          // Handle both string and boolean values from database
+          const parsedValue = typeof settings.value === 'string' 
+            ? settings.value.toLowerCase() === 'true'
+            : Boolean(settings.value)
+          setLoginEnabled(parsedValue)
+          console.log('📊 Loaded login enabled setting:', parsedValue)
+        } else {
+          console.log('Login enabled setting has null/undefined value, defaulting to true')
+          setLoginEnabled(true)
+        }
+      } catch (err) {
+        console.error('Error fetching login setting:', err)
+        setLoginEnabled(true) // Default to true on error
+      }
     }
     
     setLoading(false)
@@ -66,6 +84,10 @@ const AdminPanel: React.FC = () => {
     const next = !loginEnabled
     try {
       console.log('🔄 Attempting to update login enabled to:', next)
+      
+      if (!supabaseAdmin) {
+        throw new Error('Admin client not available - cannot update system settings')
+      }
       
       // Store as boolean directly using admin client (bypasses RLS)
       const { data, error } = await supabaseAdmin.from('system_settings').upsert({ 
@@ -153,13 +175,24 @@ const AdminPanel: React.FC = () => {
     }}>
       <h3 style={{ marginBottom: 12, flexShrink: 0 }}>Admin Panel</h3>
       <button 
-        onClick={() => { 
+        onClick={async () => { 
+          // Save any pending data first
+          try {
+            const { workScheduleDB } = await import('../utils/indexedDB');
+            await workScheduleDB.init();
+          } catch (error) {
+            console.warn('Error initializing DB before logout:', error);
+          }
+          
+          // Clear all session data
           localStorage.removeItem('staff_session');
           localStorage.removeItem('staff_onboarded');
           localStorage.removeItem('staff_first_run_complete');
           localStorage.removeItem('staff_needs_login');
           localStorage.removeItem('last_used_id_number');
-          window.location.reload();
+          
+          // Force reload without triggering beforeunload warning
+          window.location.href = window.location.origin + window.location.pathname;
         }} 
         style={{ 
           padding: '12px 14px', 
@@ -195,7 +228,25 @@ const AdminPanel: React.FC = () => {
           width: '100%'
         }}>Staff Directory</strong>
         {loading ? (
-          <div style={{ padding: 12, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
+          <div style={{ 
+            padding: 24, 
+            textAlign: 'center', 
+            color: '#6b7280',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid rgba(99, 102, 241, 0.3)',
+              borderTop: '4px solid #6366f1',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <span>Loading staff directory...</span>
+          </div>
         ) : (
           <ul style={{ 
             marginTop: 0, 
