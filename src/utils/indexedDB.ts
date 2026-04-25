@@ -1,302 +1,515 @@
-// Define constants here since they're not exported from useIndexedDB
-const DB_NAME = 'WorkScheduleDB';
-const DB_VERSION = 1;
+import { DEFAULT_SHIFT_COMBINATIONS } from '../constants';
 
-// Initialize IndexedDB database
-export const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => {
-      reject(request.error);
+interface DBSchema {
+  schedule: {
+    key: string;
+    value: {
+      date: string;
+      shifts: string[];
     };
-
-    request.onsuccess = () => {
-      resolve(request.result);
+  };
+  specialDates: {
+    key: string;
+    value: {
+      date: string;
+      isSpecial: boolean;
     };
+  };
+  settings: {
+    key: string;
+    value: any;
+  };
+  metadata: {
+    key: string;
+    value: {
+      key: string;
+      value: any;
+    };
+  };
+  monthlySalaries: {
+    key: string;
+    value: {
+      monthKey: string;
+      salary: number;
+    };
+  };
+  dateNotes: {
+    key: string;
+    value: {
+      date: string;
+      note: string;
+    };
+  };
+  userSessions: {
+    key: string;
+    value: {
+      userId: string;
+      idNumber: string;
+      surname?: string;
+      name?: string;
+      isAdmin: boolean;
+    };
+  };
+}
 
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      // Create object store for user session if it doesn't exist
-      if (!db.objectStoreNames.contains('userSession')) {
-        const store = db.createObjectStore('userSession', { keyPath: 'key' });
-        store.createIndex('value', 'value', { unique: false });
+class WorkScheduleDB {
+  private db: IDBDatabase | null = null;
+  private readonly dbName = 'WorkScheduleDB';
+  private readonly version = 6; // Incremented to apply new schema
+  private initPromise: Promise<void> | null = null;
+
+  async init(): Promise<void> {
+    // Prevent multiple simultaneous initializations
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+    
+    this.initPromise = this._init();
+    return this.initPromise;
+  }
+
+  private async _init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Check if IndexedDB is available (important for iPhone)
+      if (!window.indexedDB) {
+        console.error('❌ IndexedDB not supported');
+        reject(new Error('IndexedDB not supported'));
+        return;
       }
       
-      // Create object stores for settings and metadata
-      if (!db.objectStoreNames.contains('settings')) {
-        const store = db.createObjectStore('settings', { keyPath: 'key' });
-        store.createIndex('value', 'value', { unique: false });
-      }
+      const request = indexedDB.open(this.dbName, this.version);
+
+      request.onerror = () => {
+        console.error('❌ Failed to open IndexedDB:', request.error);
+        reject(new Error(`Failed to open database: ${request.error}`));
+      };
+
+      request.onsuccess = () => {
+        this.db = request.result;
+        console.log('✅ IndexedDB opened successfully');
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        console.log('🔧 Database upgrade needed, version:', event.oldVersion, '->', event.newVersion);
+
+        // Create object stores
+        if (!db.objectStoreNames.contains('schedule')) {
+          db.createObjectStore('schedule', { keyPath: 'date' });
+        }
+
+        if (!db.objectStoreNames.contains('specialDates')) {
+          db.createObjectStore('specialDates', { keyPath: 'date' });
+        }
+
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+
+        if (!db.objectStoreNames.contains('metadata')) {
+          db.createObjectStore('metadata', { keyPath: 'key' });
+        }
+
+        if (!db.objectStoreNames.contains('monthlySalaries')) {
+          db.createObjectStore('monthlySalaries', { keyPath: 'monthKey' });
+        }
+
+        if (!db.objectStoreNames.contains('dateNotes')) {
+          db.createObjectStore('dateNotes', { keyPath: 'date' });
+        }
+
+        if (!db.objectStoreNames.contains('userSessions')) {
+          db.createObjectStore('userSessions', { keyPath: 'userId' });
+        }
+      };
       
-      if (!db.objectStoreNames.contains('metadata')) {
-        const store = db.createObjectStore('metadata', { keyPath: 'key' });
-        store.createIndex('value', 'value', { unique: false });
-      }
+      // Add timeout for iPhone compatibility
+      setTimeout(() => {
+        if (!this.db) {
+          console.error('❌ IndexedDB initialization timeout');
+          reject(new Error('Database initialization timeout'));
+        }
+      }, 10000); // 10 second timeout
+    });
+  }
+
+  private async ensureDB(): Promise<IDBDatabase> {
+    if (!this.db) {
+      await this.init();
+    }
+    if (!this.db) {
+      // Database is not initialized, need to reopen
+      console.warn('⚠️ Database not available, reopening...');
+      this.db = null;
+      this.initPromise = null;
+      await this.init();
+    }
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    return this.db;
+  }
+
+  async getSchedule(): Promise<Record<string, string[]>> {
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['schedule'], 'readonly');
+      const store = transaction.objectStore('schedule');
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result: Record<string, string[]> = {};
+        request.result.forEach((item: { date: string; shifts: string[] }) => {
+          result[item.date] = item.shifts;
+        });
+        resolve(result);
+      };
+
+      request.onerror = () => {
+        reject(new Error('Failed to get schedule'));
+      };
+    });
+  }
+
+  async setSchedule(schedule: Record<string, string[]>): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['schedule'], 'readwrite');
+      const store = transaction.objectStore('schedule');
+
+      // Add transaction error handling
+      transaction.onerror = () => {
+        console.error('❌ Transaction error:', transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
       
-      if (!db.objectStoreNames.contains('schedule')) {
-        const store = db.createObjectStore('schedule', { keyPath: 'key' });
-        store.createIndex('value', 'value', { unique: false });
-      }
-    };
-  });
-};
+      transaction.oncomplete = () => {
+        resolve();
+      };
 
-// Get user session from IndexedDB
-export const getUserSession = async (): Promise<any> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['userSession'], 'readonly');
-    const store = transaction.objectStore('userSession');
-    const request = store.get('staff_session');
+      // Clear existing data
+      const clearRequest = store.clear();
+      
+      clearRequest.onsuccess = () => {
+        // Add new data
+        let pendingOperations = 0;
+        let completedOperations = 0;
+        let hasError = false;
+        
+        Object.entries(schedule).forEach(([date, shifts]) => {
+          if (shifts.length > 0) {
+            pendingOperations++;
+            const addRequest = store.add({ date, shifts });
+            
+            addRequest.onsuccess = () => {
+              completedOperations++;
+              if (completedOperations === pendingOperations && !hasError) {
+                // All operations completed
+              }
+            };
+            
+            addRequest.onerror = () => {
+              if (!hasError) {
+                hasError = true;
+                console.error(`❌ Failed to add schedule for ${date}:`, addRequest.error);
+                reject(new Error(`Failed to add schedule for ${date}: ${addRequest.error}`));
+              }
+            };
+          }
+        });
+        
+        // If no data to save, resolve immediately
+        if (pendingOperations === 0) {
+          console.log('✅ No schedule data to save');
+        }
+      };
 
-    request.onsuccess = () => {
-      const result = request.result;
-      resolve(result ? result.value : null);
-    };
+      clearRequest.onerror = () => {
+        console.error('❌ Failed to clear schedule:', clearRequest.error);
+        reject(new Error(`Failed to clear schedule: ${clearRequest.error}`));
+      };
+    });
+  }
 
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-};
+  async getSpecialDates(): Promise<Record<string, boolean>> {
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['specialDates'], 'readonly');
+      const store = transaction.objectStore('specialDates');
+      const request = store.getAll();
 
-// Save user session to IndexedDB
-export const saveUserSession = async (session: any): Promise<void> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['userSession'], 'readwrite');
-    const store = transaction.objectStore('userSession');
-    const request = store.put({ key: 'staff_session', value: session });
+      request.onsuccess = () => {
+        const result: Record<string, boolean> = {};
+        request.result.forEach((item: { date: string; isSpecial: boolean }) => {
+          result[item.date] = item.isSpecial;
+        });
+        resolve(result);
+      };
 
-    request.onsuccess = () => {
-      resolve();
-    };
+      request.onerror = () => {
+        reject(new Error('Failed to get special dates'));
+      };
+    });
+  }
 
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-};
+  async setSpecialDates(specialDates: Record<string, boolean>): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['specialDates'], 'readwrite');
+      const store = transaction.objectStore('specialDates');
 
-// Remove user session from IndexedDB
-export const removeUserSession = async (): Promise<void> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['userSession'], 'readwrite');
-    const store = transaction.objectStore('userSession');
-    const request = store.delete('staff_session');
+      // Add transaction error handling
+      transaction.onerror = () => {
+        console.error('❌ Special dates transaction error:', transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
+      
+      transaction.oncomplete = () => {
+        resolve();
+      };
 
-    request.onsuccess = () => {
-      resolve();
-    };
+      // Clear existing data
+      const clearRequest = store.clear();
+      
+      clearRequest.onsuccess = () => {
+        // Add new data
+        let pendingOperations = 0;
+        let completedOperations = 0;
+        let hasError = false;
+        
+        Object.entries(specialDates).forEach(([date, isSpecial]) => {
+          if (isSpecial) {
+            pendingOperations++;
+            const addRequest = store.add({ date, isSpecial });
+            
+            addRequest.onsuccess = () => {
+              completedOperations++;
+              if (completedOperations === pendingOperations && !hasError) {
+                // All operations completed
+              }
+            };
+            
+            addRequest.onerror = () => {
+              if (!hasError) {
+                hasError = true;
+                console.error(`❌ Failed to add special date for ${date}:`, addRequest.error);
+                reject(new Error(`Failed to add special date for ${date}: ${addRequest.error}`));
+              }
+            };
+          }
+        });
 
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-};
+        // If no data to save, resolve immediately
+        if (pendingOperations === 0) {
+          // No special dates to save
+        }
+      };
 
-// Get last used ID number from IndexedDB
-export const getLastUsedIdNumber = async (): Promise<string | null> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['userSession'], 'readonly');
-    const store = transaction.objectStore('userSession');
-    const request = store.get('last_used_id_number');
+      clearRequest.onerror = () => {
+        console.error('❌ Failed to clear special dates:', clearRequest.error);
+        reject(new Error(`Failed to clear special dates: ${clearRequest.error}`));
+      };
+    });
+  }
 
-    request.onsuccess = () => {
-      const result = request.result;
-      resolve(result ? result.value : null);
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-};
-
-// Save last used ID number to IndexedDB
-export const saveLastUsedIdNumber = async (idNumber: string): Promise<void> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['userSession'], 'readwrite');
-    const store = transaction.objectStore('userSession');
-    const request = store.put({ key: 'last_used_id_number', value: idNumber });
-
-    request.onsuccess = () => {
-      resolve();
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-};
-
-// Remove last used ID number from IndexedDB
-export const removeLastUsedIdNumber = async (): Promise<void> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['userSession'], 'readwrite');
-    const store = transaction.objectStore('userSession');
-    const request = store.delete('last_used_id_number');
-
-    request.onsuccess = () => {
-      resolve();
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
-};
-
-// Define the workScheduleDB object that provides the methods used by hooks
-export const workScheduleDB = {
-  init: initDB,
-  
-  // Settings-related methods
-  getSetting: async <T>(key: string): Promise<T | null> => {
-    const db = await initDB();
+  async getSetting<T>(key: string): Promise<T | null> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(['settings'], 'readonly');
       const store = transaction.objectStore('settings');
       const request = store.get(key);
 
       request.onsuccess = () => {
-        const result = request.result;
-        resolve(result ? result.value as T : null);
+        const result = request.result ? request.result.value : null;
+        
+        // Special handling for workSettings to ensure shift combinations are present
+        if (key === 'workSettings' && result && typeof result === 'object') {
+          if (!result.shiftCombinations || result.shiftCombinations.length === 0) {
+            const fixedResult = {
+              ...result,
+              shiftCombinations: DEFAULT_SHIFT_COMBINATIONS
+            };
+            
+            // Save the fixed version back to the database
+            this.setSetting(key, fixedResult).catch(err => 
+              console.error('Failed to save fixed settings:', err)
+            );
+            
+            resolve(fixedResult);
+            return;
+          }
+        }
+        
+        resolve(result);
       };
 
       request.onerror = () => {
-        reject(request.error);
+        reject(new Error(`Failed to get setting: ${key}`));
       };
     });
-  },
+  }
 
-  setSetting: async <T>(key: string, value: T): Promise<void> => {
-    const db = await initDB();
+  async setSetting<T>(key: string, value: T): Promise<void> {
+    const db = await this.ensureDB();
+    
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(['settings'], 'readwrite');
       const store = transaction.objectStore('settings');
+      
+      // Add transaction error handling
+      transaction.onerror = () => {
+        console.error(`❌ Settings transaction error for "${key}":`, transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
+      
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      
       const request = store.put({ key, value });
 
       request.onsuccess = () => {
-        resolve();
+        // Success
       };
 
       request.onerror = () => {
-        reject(request.error);
+        console.error(`❌ Failed to set setting "${key}":`, request.error);
+        reject(new Error(`Failed to set setting: ${key} - ${request.error}`));
       };
     });
-  },
+  }
 
-  // Metadata-related methods
-  getMetadata: async <T>(key: string): Promise<T | null> => {
-    const db = await initDB();
+  async getMetadata<T>(key: string): Promise<T | null> {
+    const db = await this.ensureDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(['metadata'], 'readonly');
       const store = transaction.objectStore('metadata');
       const request = store.get(key);
 
       request.onsuccess = () => {
-        const result = request.result;
-        resolve(result ? result.value as T : null);
+        resolve(request.result ? request.result.value : null);
       };
 
       request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  },
-
-  setMetadata: async <T>(key: string, value: T): Promise<void> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['metadata'], 'readwrite');
-      const store = transaction.objectStore('metadata');
-      const request = store.put({ key, value });
-
-      request.onsuccess = () => {
-        resolve();
-      };
-
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  },
-
-  // Schedule-related methods
-  getSchedule: async (): Promise<Record<string, string[]>> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['schedule'], 'readonly');
-      const store = transaction.objectStore('schedule');
-      const request = store.get('schedule_data');
-
-      request.onsuccess = () => {
-        const result = request.result;
-        resolve(result ? result.value as Record<string, string[]> : {});
-      };
-
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  },
-
-  setSchedule: async (schedule: Record<string, string[]>): Promise<void> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['schedule'], 'readwrite');
-      const store = transaction.objectStore('schedule');
-      const request = store.put({ key: 'schedule_data', value: schedule });
-
-      request.onsuccess = () => {
-        resolve();
-      };
-
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  },
-
-  getSpecialDates: async (): Promise<Record<string, boolean>> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['schedule'], 'readonly');
-      const store = transaction.objectStore('schedule');
-      const request = store.get('special_dates');
-
-      request.onsuccess = () => {
-        const result = request.result;
-        resolve(result ? result.value as Record<string, boolean> : {});
-      };
-
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  },
-
-  setSpecialDates: async (specialDates: Record<string, boolean>): Promise<void> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['schedule'], 'readwrite');
-      const store = transaction.objectStore('schedule');
-      const request = store.put({ key: 'special_dates', value: specialDates });
-
-      request.onsuccess = () => {
-        resolve();
-      };
-
-      request.onerror = () => {
-        reject(request.error);
+        reject(new Error(`Failed to get metadata: ${key}`));
       };
     });
   }
+
+  async setMetadata<T>(key: string, value: T): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['metadata'], 'readwrite');
+      const store = transaction.objectStore('metadata');
+      
+      transaction.onerror = () => {
+        console.error(`❌ Metadata transaction error for "${key}":`, transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
+      
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      
+      const request = store.put({ key, value });
+
+      request.onsuccess = () => {
+        // Success
+      };
+
+      request.onerror = () => {
+        console.error(`❌ Failed to set metadata "${key}":`, request.error);
+        reject(new Error(`Failed to set metadata: ${key} - ${request.error}`));
+      };
+    });
+  }
+
+  async getDateNotes(): Promise<Record<string, string>> {
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['dateNotes'], 'readonly');
+      const store = transaction.objectStore('dateNotes');
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result: Record<string, string> = {};
+        request.result.forEach((item: { date: string; note: string }) => {
+          result[item.date] = item.note;
+        });
+        resolve(result);
+      };
+
+      request.onerror = () => {
+        reject(new Error('Failed to get date notes'));
+      };
+    });
+  }
+
+  async setDateNotes(dateNotes: Record<string, string>): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['dateNotes'], 'readwrite');
+      const store = transaction.objectStore('dateNotes');
+
+      transaction.onerror = () => {
+        console.error('❌ Date notes transaction error:', transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
+      
+      transaction.oncomplete = () => {
+        resolve();
+      };
+
+      const clearRequest = store.clear();
+      
+      clearRequest.onsuccess = () => {
+        let pendingOperations = 0;
+        let completedOperations = 0;
+        let hasError = false;
+        
+        Object.entries(dateNotes).forEach(([date, note]) => {
+          if (note) {
+            pendingOperations++;
+            const addRequest = store.add({ date, note });
+            
+            addRequest.onsuccess = () => {
+              completedOperations++;
+              if (completedOperations === pendingOperations && !hasError) {
+                // All operations completed
+              }
+            };
+            
+            addRequest.onerror = () => {
+              if (!hasError) {
+                hasError = true;
+                console.error(`❌ Failed to add date note for ${date}:`, addRequest.error);
+                reject(new Error(`Failed to add date note for ${date}: ${addRequest.error}`));
+              }
+            };
+          }
+        });
+
+        if (pendingOperations === 0) {
+          // No date notes to save
+        }
+      };
+
+      clearRequest.onerror = () => {
+        console.error('❌ Failed to clear date notes:', clearRequest.error);
+        reject(new Error(`Failed to clear date notes: ${clearRequest.error}`));
+      };
+    });
+  }
+}
+
+export const workScheduleDB = new WorkScheduleDB();
+
+// Legacy functions for backward compatibility
+export const initDB = (): Promise<IDBDatabase> => {
+  return workScheduleDB.init().then(() => (workScheduleDB as any).db);
 };
