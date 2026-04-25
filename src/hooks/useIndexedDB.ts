@@ -144,8 +144,8 @@ export function useIndexedDB<T>(
 }
 
 export function useScheduleData() {
-  const [schedule, setScheduleState] = useState<Record<string, string[]>>({});
-  const [specialDates, setSpecialDatesState] = useState<Record<string, boolean>>({});
+  const [schedule, setSchedule] = useState<Record<string, string[]>>({});
+  const [specialDates, setSpecialDates] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -168,8 +168,8 @@ export function useScheduleData() {
         specialDatesEntries: Object.keys(specialDatesData).length
       });
       
-      setScheduleState(scheduleData);
-      setSpecialDatesState(specialDatesData);
+      setSchedule(scheduleData);
+      setSpecialDates(specialDatesData);
       console.log('✅ Schedule data loaded successfully');
     } catch (err) {
       console.error('❌ Error loading schedule data:', err);
@@ -184,7 +184,7 @@ export function useScheduleData() {
   }, [loadData]);
 
   const updateSchedule = useCallback(async (newSchedule: Record<string, string[]> | ((prev: Record<string, string[]>) => Record<string, string[]>)) => {
-    let scheduleToStore: Record<string, string[]>;
+    let scheduleToStore: Record<string, string[]> = schedule; // Initialize with current value
     
     try {
       setError(null);
@@ -195,15 +195,16 @@ export function useScheduleData() {
       console.log('💾 Saving schedule data:', {
         entries: Object.keys(scheduleToStore).length
       });
-      setScheduleState(scheduleToStore);
+      setSchedule(scheduleToStore);
       
       // Ensure database is initialized
       await workScheduleDB.init();
       await workScheduleDB.setSchedule(scheduleToStore);
       console.log('✅ Schedule data saved successfully');
       
-      // Add delay for iPhone persistence
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Enhanced delay for Android/iPhone persistence
+      // Modern Android devices have aggressive power management that can interrupt transactions
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
       
     } catch (err) {
       console.error('❌ Error saving schedule:', err);
@@ -214,10 +215,7 @@ export function useScheduleData() {
         console.log('🔄 Retrying schedule save...');
         try {
           await new Promise(resolve => setTimeout(resolve, 500));
-          const retryData = typeof newSchedule === 'function' 
-            ? newSchedule(schedule) 
-            : newSchedule;
-          await workScheduleDB.setSchedule(retryData);
+          await workScheduleDB.setSchedule(scheduleToStore);
           console.log('✅ Schedule retry successful');
           setError(null);
         } catch (retryErr) {
@@ -228,26 +226,25 @@ export function useScheduleData() {
   }, [schedule]);
 
   const updateSpecialDates = useCallback(async (newSpecialDates: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => {
-    let specialDatesToStore: Record<string, boolean>;
-    
     try {
       setError(null);
-      specialDatesToStore = typeof newSpecialDates === 'function' 
+      const specialDatesToStore = typeof newSpecialDates === 'function' 
         ? newSpecialDates(specialDates) 
         : newSpecialDates;
       
       console.log('💾 Saving special dates data:', {
         entries: Object.keys(specialDatesToStore).length
       });
-      setSpecialDatesState(specialDatesToStore);
+      setSpecialDates(specialDatesToStore);
       
       // Ensure database is initialized
       await workScheduleDB.init();
       await workScheduleDB.setSpecialDates(specialDatesToStore);
       console.log('✅ Special dates data saved successfully');
       
-      // Add delay for iPhone persistence
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Enhanced delay for Android/iPhone persistence
+      // Modern Android devices have aggressive power management that can interrupt transactions
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
       
     } catch (err) {
       console.error('❌ Error saving special dates:', err);
@@ -258,10 +255,7 @@ export function useScheduleData() {
         console.log('🔄 Retrying special dates save...');
         try {
           await new Promise(resolve => setTimeout(resolve, 500));
-          const retryData = typeof newSpecialDates === 'function' 
-            ? newSpecialDates(specialDates) 
-            : newSpecialDates;
-          await workScheduleDB.setSpecialDates(retryData);
+          await workScheduleDB.setSpecialDates(specialDatesToStore);
           console.log('✅ Special dates retry successful');
           setError(null);
         } catch (retryErr) {
