@@ -505,9 +505,154 @@ class WorkScheduleDB {
       };
     });
   }
+
+  async saveUserSession(session: { userId: string; idNumber: string; surname?: string; name?: string; isAdmin: boolean }): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['userSessions'], 'readwrite');
+      const store = transaction.objectStore('userSessions');
+      
+      transaction.onerror = () => {
+        console.error('❌ Save session transaction error:', transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
+      
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      
+      const request = store.put(session);
+      
+      request.onsuccess = () => {
+        // Success
+      };
+      
+      request.onerror = () => {
+        console.error('❌ Failed to save user session:', request.error);
+        reject(new Error(`Failed to save user session: ${request.error}`));
+      };
+    });
+  }
+
+  async getUserSession(): Promise<{ userId: string; idNumber: string; surname?: string; name?: string; isAdmin: boolean } | null> {
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['userSessions'], 'readonly');
+      const store = transaction.objectStore('userSessions');
+      const request = store.get('staff_session');
+      
+      request.onsuccess = () => {
+        resolve(request.result || null);
+      };
+      
+      request.onerror = () => {
+        console.error('❌ Failed to get user session:', request.error);
+        reject(new Error(`Failed to get user session: ${request.error}`));
+      };
+    });
+  }
+
+  async removeUserSession(): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['userSessions'], 'readwrite');
+      const store = transaction.objectStore('userSessions');
+      const request = store.delete('staff_session');
+      
+      request.onsuccess = () => {
+        resolve();
+      };
+      
+      request.onerror = () => {
+        console.error('❌ Failed to remove user session:', request.error);
+        reject(new Error(`Failed to remove user session: ${request.error}`));
+      };
+    });
+  }
+
+  async saveLastUsedIdNumber(idNumber: string): Promise<void> {
+    const db = await this.ensureDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['userSessions'], 'readwrite');
+      const store = transaction.objectStore('userSessions');
+      
+      transaction.onerror = () => {
+        console.error('❌ Save ID number transaction error:', transaction.error);
+        reject(new Error(`Transaction failed: ${transaction.error}`));
+      };
+      
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      
+      const request = store.put({ 
+        userId: '_lastUsedIdNumber', 
+        idNumber,
+        isAdmin: false 
+      });
+      
+      request.onsuccess = () => {
+        // Success
+      };
+      
+      request.onerror = () => {
+        console.error('❌ Failed to save ID number:', request.error);
+        reject(new Error(`Failed to save ID number: ${request.error}`));
+      };
+    });
+  }
+
+  async getLastUsedIdNumber(): Promise<string | null> {
+    const db = await this.ensureDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['userSessions'], 'readonly');
+      const store = transaction.objectStore('userSessions');
+      const request = store.get('_lastUsedIdNumber');
+      
+      request.onsuccess = () => {
+        const result = request.result?.idNumber || null;
+        resolve(result);
+      };
+      
+      request.onerror = () => {
+        console.error('❌ Failed to get last used ID number:', request.error);
+        reject(new Error(`Failed to get last used ID number: ${request.error}`));
+      };
+    });
+  }
 }
 
 export const workScheduleDB = new WorkScheduleDB();
+
+// Convenience export functions for user session management
+export const saveUserSession = async (session: { 
+  userId: string; 
+  idNumber: string; 
+  surname?: string; 
+  name?: string; 
+  isAdmin: boolean 
+}) => {
+  await workScheduleDB.saveUserSession(session);
+};
+
+export const getUserSession = async () => {
+  return await workScheduleDB.getUserSession();
+};
+
+export const removeUserSession = async () => {
+  await workScheduleDB.removeUserSession();
+};
+
+export const saveLastUsedIdNumber = async (idNumber: string) => {
+  await workScheduleDB.saveLastUsedIdNumber(idNumber);
+};
+
+export const getLastUsedIdNumber = async () => {
+  return await workScheduleDB.getLastUsedIdNumber();
+};
 
 // Legacy functions for backward compatibility
 export const initDB = (): Promise<IDBDatabase> => {
