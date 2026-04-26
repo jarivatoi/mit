@@ -1,696 +1,679 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
-import { saveLastUsedIdNumber, getLastUsedIdNumber } from '../utils/indexedDB';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Calendar } from './components/Calendar';
+import { ShiftModal } from './components/ShiftModal';
+import { SettingsPanel } from './components/SettingsPanel';
+import { MenuPanel } from './components/MenuPanel';
+import TabNavigation from './components/TabNavigation';
+import { useScheduleCalculations } from './hooks/useScheduleCalculations';
+import { useIndexedDB, useScheduleData } from './hooks/useIndexedDB';
+import { DEFAULT_SHIFT_COMBINATIONS } from './constants';
+import { AddToHomescreen } from './utils/addToHomescreen';
+import { Settings } from './types';
 import { gsap } from 'gsap';
-import SplitText from '../utils/SplitText';
+import StaffOnboard from './components/StaffOnboard';
+import StaffLogin from './components/StaffLogin';
+import ProfileTab from './components/ProfileTab';
+import { saveUserSession, getUserSession, removeUserSession, saveLastUsedIdNumber, getLastUsedIdNumber, workScheduleDB } from './utils/indexedDB';
 
-// Animated Registration Button Component
-const AnimatedRegistrationButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const text1Ref = useRef<HTMLSpanElement>(null);
-  const text2Ref = useRef<HTMLSpanElement>(null);
+type UserSession = { userId: string; idNumber: string; surname?: string; name?: string; isAdmin: boolean } | null
+type UserProfile = { id: string; idNumber: string; surname: string; name: string; isAdmin: boolean } | null
 
+// Root app orchestrator: onboarding -> login -> main UI
+const App: React.FC = () => {
+  const [phase, setPhase] = useState<'onboard'|'login'|'main'|null>(null)
+  const [user, setUser] = useState<UserSession>(null)
+  const [loginKey, setLoginKey] = useState(0) // Key to force re-mount of StaffLogin
+
+  // Initialize phase on load
   useEffect(() => {
-    if (text1Ref.current && text2Ref.current) {
-      SplitText.register(gsap);
+    // Always start with login screen - no session persistence
+    setPhase('login');
+  }, [])
 
-      // Create SplitText instances for both texts
-      const split1 = new SplitText(text1Ref.current, {
-        type: 'chars',
-        wordsClass: 'split-word',
-        charsClass: 'split-char'
-      });
+  // Show nothing while initializing (prevents flash of wrong screen)
+  if (phase === null) {
+    return null;
+  }
 
-      const split2 = new SplitText(text2Ref.current, {
-        type: 'chars',
-        wordsClass: 'split-word',
-        charsClass: 'split-char'
-      });
-
-      // Set initial states - both texts start hidden off to the right
-      gsap.set(split1.chars, {
-        opacity: 0,
-        x: 50, // Start positioned to the right
-        y: 0,
-        scale: 1,
-        display: 'inline-block'
-      });
-
-      gsap.set(split2.chars, {
-        opacity: 0,
-        x: 50, // Start positioned to the right
-        y: 0,
-        scale: 1,
-        display: 'inline-block'
-      });
-
-      // Ensure only Registration is visible initially by making chars inline-block
-      gsap.set(split1.chars, {
-        opacity: 1,
-        x: 0,
-        display: 'inline-block'
-      });
-
-      // Create timeline for seamless loop
-      const tl = gsap.timeline({
-        repeat: -1,
-        repeatDelay: 0.5
-      });
-
-      // Animate "Registration" in - slide from right to left
-      tl.to(split1.chars, {
-        opacity: 1,
-        x: 0, // Slide to original position from right
-        duration: 0.5,
-        stagger: 0.03,
-        ease: 'power2.out'
-      });
-
-      // Hold for a moment
-      tl.to({}, { duration: 0.5 });
-
-      // Animate "Registration" out - fade out (stay in place)
-      tl.to(split1.chars, {
-        opacity: 0,
-        duration: 0.5,
-        stagger: 0.03,
-        ease: 'power2.in'
-      });
-
-      // Animate "First Time Users Only" in - slide from right to left
-      tl.to(split2.chars, {
-        opacity: 1,
-        x: 0, // Slide to original position from right
-        duration: 0.5,
-        stagger: 0.03,
-        ease: 'power2.out'
-      }, '-=0.4');
-
-      // Hold for a moment
-      tl.to({}, { duration: 0.5 });
-
-      // Animate "First Time Users Only" out - fade out (stay in place)
-      tl.to(split2.chars, {
-        opacity: 0,
-        duration: 0.7,
-        stagger: 0.03,
-        ease: 'power2.in'
-      });
-
-      // Reset Registration to starting position (off-screen right) while First Time Users Only is fading out
-      tl.set(split1.chars, {
-        x: 50,
-        opacity: 0
-      }, '-=0.4');
-
-      // Loop back to Registration sliding in from right
-      tl.to(split1.chars, {
-        opacity: 1,
-        x: 0, // Slide to original position from right
-        duration: 0.5,
-        stagger: 0.03,
-        ease: 'power2.out'
-      }, '-=0.4');
-
-      return () => {
-        split1.revert();
-        split2.revert();
-        tl.kill();
-      };
+  const onOnboardComplete = async (userData: { id?: string; idNumber?: string; surname?: string; name?: string; isAdmin?: boolean }) => {
+    // Store the user's ID Number for auto-fill on next login
+    if (userData?.idNumber) {
+      await saveLastUsedIdNumber(userData.idNumber);
     }
-  }, []);
+    // After successful registration, redirect to login screen
+    // User must manually login with their credentials
+    setPhase('login');
+  }
 
-  return (
-    <button
-      ref={buttonRef}
-      onClick={onClick}
-      style={{
-        ...buttonStyle,
-        background: '#10b981',
-        position: 'relative',
-        overflow: 'hidden',
-        minHeight: '48px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}
-    >
-      <span ref={text1Ref} style={{ display: 'block', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>Registration</span>
-      <span ref={text2Ref} style={{ display: 'block', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>First Time Users Only</span>
-    </button>
-  );
+  const onLoginSuccess = async (sess: { userId: string; idNumber: string; isAdmin: boolean; surname?: string; name?: string }) => {
+    // Don't save session - require login on every refresh
+    setUser({ 
+      userId: sess.userId, 
+      idNumber: sess.idNumber, 
+      isAdmin: !!sess.isAdmin,
+      surname: sess.surname,
+      name: sess.name
+    });
+    setPhase('main');
+  }
+
+  if (phase === 'onboard') {
+    return <StaffOnboard onComplete={onOnboardComplete} onBack={() => {
+      setPhase('login');
+      setLoginKey(prev => prev + 1); // Force re-mount animation
+    }} />
+  }
+  if (phase === 'login') {
+    return <StaffLogin key={loginKey} onLoginSuccess={onLoginSuccess} onRegister={() => setPhase('onboard')} showIdField={true} />
+  }
+
+  // Main app after authentication
+  return <AuthenticatedApp user={user} onLoginSuccess={onLoginSuccess} />;
 }
 
-type StaffLoginProps = {
-  onLoginSuccess: (session: { userId: string; idNumber: string; isAdmin: boolean; surname?: string; name?: string }) => void
-  onRegister?: () => void
-  showIdField?: boolean
-}
-
-const hash = async (input: string) => {
-  const enc = new TextEncoder()
-  const data = enc.encode(input)
-  const d = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, showIdField = true }) => {
-  const headerRef = useRef<HTMLHeadingElement>(null);
-  const animationTriggerRef = useRef(0); // Track animation trigger count
-
-  // Try to get the last used ID number from IndexedDB to pre-fill
-  const [idNumber, setIdNumber] = useState('');
+// Component for authenticated users
+const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { userId: string; idNumber: string; isAdmin: boolean }) => void }> = ({ user, onLoginSuccess }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'calendar' | 'settings' | 'data' | 'profile'>('calendar');
   
+  // Add artificial loading delay for better UX
+  const [artificialLoading, setArtificialLoading] = useState(true);
+  const [smoothProgress, setSmoothProgress] = useState(0);
+  const [showMainApp, setShowMainApp] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Use IndexedDB hooks
+  const { schedule, specialDates, setSchedule, setSpecialDates } = useScheduleData();
+  const [dateNotes, setDateNotes] = useIndexedDB<Record<string, string>>('dateNotes', {});
+  const [scheduleTitle, setScheduleTitle] = useIndexedDB<string>('scheduleTitle', 'Work Schedule', 'metadata');
+  const [monthlySalaries, setMonthlySalaries] = useIndexedDB<Record<string, number>>('monthlySalaries', {}, 'metadata');
+  const [settings, setSettings] = useIndexedDB<Settings & { useManualMode?: boolean }>('workSettings', {
+    basicSalary: 35000,
+    hourlyRate: 201.92,
+    shiftCombinations: DEFAULT_SHIFT_COMBINATIONS,
+    useManualMode: false // Add manual mode flag to settings
+  });
+  
+  // Add refreshKey state
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Handle monthly salary changes
+  const handleMonthlySalaryChange = (year: number, month: number, salary: number) => {
+    const monthKey = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+    setMonthlySalaries(prev => ({
+      ...prev,
+      [monthKey]: salary
+    }));
+    setRefreshKey(prev => prev + 1); // Force refresh calculations
+  };
+  
+  // Note: beforeunload handler removed since IndexedDB now auto-saves immediately
+  // with the singleton pattern. No need to force save on unload anymore.
+  
+  // Get current month and year for salary lookup
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+  const monthKey = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`;
+  const currentMonthlySalary = monthlySalaries[monthKey] || 0;
+  
+  // Pass specialDates to the calculation hook with refreshKey dependency and monthly salary
+  const { totalAmount, monthToDateAmount } = useScheduleCalculations(schedule, settings, specialDates, currentDate, refreshKey, currentMonthlySalary);
+
+  // Check if data is loading
+  // Remove database dependency for initial load
+
+  // Add artificial loading delay to ensure users can read the loading screen
   useEffect(() => {
-    const loadLastId = async () => {
-      try {
-        const lastId = await getLastUsedIdNumber();
-        if (lastId) {
-          setIdNumber(lastId);
-        }
-      } catch (error) {
-        console.warn('Could not load last used ID number from IndexedDB, falling back to localStorage:', error);
-        // Fallback to localStorage if IndexedDB fails
-        const fallbackId = localStorage.getItem('last_used_id_number');
-        if (fallbackId) {
-          setIdNumber(fallbackId);
-        }
+    let animationFrame: number;
+    let startTime: number;
+    const duration = 3000; // 3 seconds
+    
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Smooth easing function for natural progress
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      const smoothedProgress = Math.round(easeOutQuart * 100);
+      
+      setSmoothProgress(smoothedProgress);
+      
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      } else {
+        setSmoothProgress(100);
+        setTimeout(() => {
+          setArtificialLoading(false);
+          setShowMainApp(true);
+        }, 100); // Small delay after reaching 100%
       }
     };
     
-    loadLastId();
-  }, []);
-
-  const [passcode, setPasscode] = useState('')
-  const [showPasscode, setShowPasscode] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showForgotPasscode, setShowForgotPasscode] = useState(false)
-  const [tempIdNumber, setTempIdNumber] = useState('')
-  const [idVerified, setIdVerified] = useState(false)
-  const [newPasscode, setNewPasscode] = useState('')
-  const [confirmPasscode, setConfirmPasscode] = useState('')
-  const [showNewPasscode, setShowNewPasscode] = useState(false)
-  const [showConfirmPasscode, setShowConfirmPasscode] = useState(false)
-
-  // GSAP SplitText wave zoom animation for "Staff Sign In" header
-  useEffect(() => {
-    if (headerRef.current) {
-      // Register SplitText with GSAP core
-      SplitText.register(gsap);
-      
-      // Create SplitText instance
-      const split = new SplitText(headerRef.current, {
-        type: 'chars',
-        wordsClass: 'split-word',
-        charsClass: 'split-char'
-      });
-      
-      // Set initial state of all characters - hidden and scaled down
-      gsap.set(split.chars, {
-        opacity: 0,
-        scale: 0.5,
-        y: -100,
-        rotationX: -90,
-        transformOrigin: 'center center -50',
-        display: 'inline-block'
-      });
-      
-      // Apply gradient to each character
-      split.chars.forEach(char => {
-        char.style.background = 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
-        char.style.backgroundClip = 'text';
-        char.style.webkitBackgroundClip = 'text';
-        char.style.webkitTextFillColor = 'transparent';
-      });
-      
-      // Create timeline for entrance and exit animation
-      const tl = gsap.timeline({
-        repeat: -1,
-        repeatDelay: 1.5
-      });
-      
-      // Animate characters IN - drop down from top
-      tl.to(split.chars, {
-        opacity: 1,
-        scale: 1,
-        y: 0,
-        rotationX: 0,
-        duration: 0.6,
-        stagger: 0.08,
-        ease: 'back.out(1.7)',
-        transformOrigin: 'center center'
-      });
-      
-      // Hold for a moment
-      tl.to({}, { duration: 1.5 });
-      
-      // Animate characters OUT - starting from last character, moving downward
-      tl.to(split.chars, {
-        opacity: 0,
-        scale: 0.5,
-        y: 50, // Move downward toward ID number field
-        rotationX: -90,
-        duration: 0.4,
-        stagger: {
-          amount: 0.3,
-          from: 'end' // Start from last character
-        },
-        ease: 'back.in(1.7)',
-        transformOrigin: 'center center'
-      });
-      
-      // Reset to starting position while invisible
-      tl.set(split.chars, {
-        y: -100,
-        rotationX: -90,
-        scale: 0.5
-      });
-
-      return () => {
-        // Cleanup on unmount or dependency change
-        split.revert();
-      };
-    }
-  }, [showForgotPasscode]); // Re-run animation when forgot passcode state changes
-
-  // Check if user is online
-  const checkOnlineStatus = (): boolean => {
-    return navigator.onLine
-  }
-
-  // Monitor online/offline status
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('🌐 User is back online');
-    };
-
-    const handleOffline = () => {
-      console.log('📡 User went offline');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
+    animationFrame = requestAnimationFrame(animate);
+    
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
     };
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // Check if user is online FIRST, before clearing errors
-    if (!checkOnlineStatus()) {
-      setError('You are currently offline, please check your connectivity and try again...')
-      return
-    }
-    
-    // Clear any previous errors only after confirming we're online
-    setError(null)
-    
-    // Determine the ID number to use
-    const actualIdNumber = showIdField ? idNumber : (passcode === '5274' ? '5274' : idNumber)
-    
-    // Validate that both ID Number and Passcode are provided
-    if (!actualIdNumber || !passcode) {
-      setError('Enter a Valid ID Number and Passcode')
-      return
-    }
-    
-    // MVP admin bypass - if passcode is '5274', treat as admin regardless of ID field visibility
-    if (passcode === '5274' && actualIdNumber === '5274') {
-      const session = { userId: 'admin-5274', idNumber: '5274', isAdmin: true };
-      onLoginSuccess(session);
-      return
-    }
-    
-    // Check the global login setting FIRST using admin client (before checking user)
-    let loginEnabled = true; // Default to enabled if setting doesn't exist
-    try {
-      const { data: settings, error: settingsError } = await supabaseAdmin.from('system_settings').select('value').eq('key', 'login_enabled').single()
-      
-      if (!settingsError && settings?.value !== undefined && settings?.value !== null) {
-        // Handle both string and boolean values from database
-        loginEnabled = typeof settings.value === 'string' 
-          ? settings.value.toLowerCase() === 'true'
-          : Boolean(settings.value);
-      }
-    } catch {
-      // If settings don't exist, default to enabled
-      // This handles cases where the system_settings table doesn't have the login_enabled key yet
-    }
-    
-    // If login is disabled, show error immediately
-    if (!loginEnabled) {
-      setError('Login is currently disabled by admin')
-      return
-    }
-    
-    // Regular staff login flow
-    try {
-      // First, check if the user exists
-      const rec = await (await import('../lib/supabase')).supabase.from('staff_users').select('id, surname, name, id_number, passcode_hash, is_admin, is_active').eq('id_number', actualIdNumber).single()
-      console.log('User lookup result:', rec);
-      
-      // Check for duplicate ID numbers
-      const duplicates = await (await import('../lib/supabase')).supabase.from('staff_users').select('id, id_number, passcode_hash').eq('id_number', actualIdNumber);
-      console.log('Duplicate check for ID', actualIdNumber, ':', duplicates);
-      
-      if (rec.error || !rec.data) throw new Error('User not found')
-      const row = rec.data
-      if (!row.is_active) throw new Error('User is inactive')
-      
-      const hashed = await hash(passcode)
-      console.log('Login attempt:', { passcode, hashed, storedHash: row.passcode_hash });
-      if (hashed !== row.passcode_hash) throw new Error('Incorrect passcode')
-      await (await import('../lib/supabase')).supabase.from('staff_users').update({ last_login: new Date().toISOString() }).eq('id', row.id)
-      // Store the ID number in IndexedDB for future logins
-      try {
-        await saveLastUsedIdNumber(row.id_number);
-      } catch (error) {
-        console.warn('Could not save ID number to IndexedDB, falling back to localStorage:', error);
-        // Fallback to localStorage if IndexedDB fails
-        localStorage.setItem('last_used_id_number', row.id_number);
-      }
-      onLoginSuccess({ 
-        userId: row.id, 
-        idNumber: row.id_number, 
-        isAdmin: !!row.is_admin,
-        surname: row.surname || '',
-        name: row.name || ''
-      })
-    } catch (err: any) {
-      setError(err?.message ?? 'Login failed')
-    }
-  }
+  // Only use artificial loading for initial screen
+  const isLoading = artificialLoading;
 
-  const handleForgotPasscode = async () => {
-    setError(null)
-    setPasscode('') // Clear the passcode field when starting forgot passcode flow
-    console.log('Starting forgot passcode flow with tempIdNumber:', tempIdNumber);
-    
-    // Check if user is online
-    if (!checkOnlineStatus()) {
-      setError('You are currently offline, please check your connectivity and try again...')
-      return
-    }
-    
-    // Validate ID Number field
-    if (!tempIdNumber || tempIdNumber.trim().length === 0) {
-      setError('Enter a valid ID')
-      return
-    }
-    
-    // Check if ID is exactly 14 alphanumeric characters
-    if (!/^[A-Z0-9]{14}$/.test(tempIdNumber)) {
-      setError('Enter a valid ID')
-      return
-    }
-    
-    try {
-      const { data, error } = await supabase.from('staff_users').select('id').eq('id_number', tempIdNumber).single()
-      console.log('ID verification result:', { data, error, tempIdNumber });
-      if (error || !data) {
-        setError('Incorrect ID Number')
-        return
-      }
+  // Initialize Add to Home Screen functionality
+  useEffect(() => {
+    if (showMainApp) {
+      // Create AddToHomescreen instance
+      const addToHomescreenInstance = new AddToHomescreen({
+        appName: 'X-ray MIT',
+        appIconUrl: 'https://jarivatoi.github.io/mit/icon.png',
+        maxModalDisplayCount: 1, // Only show once
+        skipFirstVisit: false, // Show on first visit
+        startDelay: 3000, // 3 second delay for first visit
+        lifespan: 20000,
+        mustShowCustomPrompt: false, // Use normal detection logic
+        displayPace: 999999 // Very large number to prevent showing again
+      });
       
-      // ID verified, now allow setting new passcode
-      setIdVerified(true) // Set verification state
-      setError(null)
-    } catch (err) {
-      setError('Incorrect ID Number')
+      // Check if can prompt (now async)
+      const checkAndShow = async () => {
+        const canShow = await addToHomescreenInstance.canPrompt();
+        
+        if (canShow) {
+          setTimeout(() => {
+            addToHomescreenInstance.show();
+          }, 3000); // 3 second delay
+        }
+      };
+      
+      checkAndShow();
     }
-  }
+  }, [showMainApp]);
 
-  const handleUpdatePasscode = async () => {
-    if (newPasscode !== confirmPasscode) {
-      setError('Passcodes do not match')
-      return
-    }
-    
-    if (newPasscode.length !== 4 || !/^\d{4}$/.test(newPasscode)) {
-      setError('Passcode must be 4 digits')
-      return
-    }
-    
-    // Check if user is online
-    if (!checkOnlineStatus()) {
-      setError('You are currently offline, please check your connectivity and try again...')
-      return
-    }
-    
-    try {
-      const hashedPasscode = await hash(newPasscode)
-      console.log('Updating password:', { newPasscode, hashedPasscode, tempIdNumber });
-      console.log('Update query will target id_number:', tempIdNumber);
-      if (!tempIdNumber) {
-        setError('ID number not found');
-        return;
-      }
-      const { error } = await supabase.from('staff_users').update({ passcode_hash: hashedPasscode }).eq('id_number', tempIdNumber)
-      
-      if (error) {
-        console.error('Update error:', error);
-        throw error;
-      }
-      
-      // Verify the update actually happened
-      const verify = await supabase.from('staff_users').select('passcode_hash').eq('id_number', tempIdNumber).single();
-      console.log('Verification after update:', { expected: hashedPasscode, actual: verify.data?.passcode_hash, match: hashedPasscode === verify.data?.passcode_hash });
-      
-      setError('Passcode updated successfully')
-      setShowForgotPasscode(false)
-      setNewPasscode('')
-      setConfirmPasscode('')
-      setTempIdNumber('')
-      setIdVerified(false) // Reset verification state
-      setPasscode('') // Clear the main passcode field
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to update passcode')
-    }
-  }
+  // Listen for navigation to specific month
+  useEffect(() => {
+    const handleNavigateToMonth = (event: CustomEvent) => {
+      const { month, year } = event.detail;
+      setCurrentDate(new Date(year, month, 1));
+    };
 
-  if (showForgotPasscode) {
-    if (!idVerified) {
-      return (
-        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
-            <h2 style={{ textAlign: 'center' }}>Forgot Passcode</h2>
-            <input 
-              placeholder="Enter ID Number" 
-              value={tempIdNumber} 
-              onChange={e => {
-                const value = e.target.value.toUpperCase();
-                setTempIdNumber(value);
-                // Clear error if we have a valid 14-character alphanumeric ID
-                if (/^[A-Z0-9]{14}$/.test(value)) {
-                  setError(null);
-                }
-              }} 
-              style={inputStyle} 
-              autoCapitalize="characters"
-              onKeyDown={e => {
-                // Prevent Enter key from submitting the form
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleForgotPasscode();
-                }
-              }}
-            />
-            {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
-            <button onClick={handleForgotPasscode} style={buttonStyle}>Verify ID</button>
-            <button type="button" onClick={() => {
-              setShowForgotPasscode(false); 
-              setTempIdNumber(''); 
-              setIdVerified(false); 
-              setError(null); 
-              setPasscode('');
-              window.scrollTo(0, 0); // Reset scroll to top
-            }} style={{ ...buttonStyle, background: '#6b7280' }}>Back</button>
-          </div>
-        </div>
-      )
-    } else if (idVerified) {
-      return (
-        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
-            <h2 style={{ textAlign: 'center' }}>Update Passcode</h2>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input 
-                placeholder="New 4-digit Passcode" 
-                value={newPasscode} 
-                onChange={e => setNewPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
-                type={showNewPasscode ? 'text' : 'password'}
-                inputMode="numeric" 
-                maxLength={4}
-              />
-              <button
-                type="button"
-                onMouseDown={() => setShowNewPasscode(true)}
-                onMouseUp={() => setShowNewPasscode(false)}
-                onMouseLeave={() => setShowNewPasscode(false)}
-                onTouchStart={() => setShowNewPasscode(true)}
-                onTouchEnd={() => setShowNewPasscode(false)}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '8px',
-                  fontSize: '18px',
-                  color: '#6b7280'
-                }}
-              >
-                {showNewPasscode ? '🙈' : '👁️'}
-              </button>
-            </div>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input 
-                placeholder="Re-enter Passcode" 
-                value={confirmPasscode} 
-                onChange={e => setConfirmPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
-                type={showConfirmPasscode ? 'text' : 'password'}
-                inputMode="numeric" 
-                maxLength={4}
-              />
-              <button
-                type="button"
-                onMouseDown={() => setShowConfirmPasscode(true)}
-                onMouseUp={() => setShowConfirmPasscode(false)}
-                onMouseLeave={() => setShowConfirmPasscode(false)}
-                onTouchStart={() => setShowConfirmPasscode(true)}
-                onTouchEnd={() => setShowConfirmPasscode(false)}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '8px',
-                  fontSize: '18px',
-                  color: '#6b7280'
-                }}
-              >
-                {showConfirmPasscode ? '🙈' : '👁️'}
-              </button>
-            </div>
-            {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
-            <button onClick={handleUpdatePasscode} style={buttonStyle}>Update Passcode</button>
-            <button type="button" onClick={() => {
-              setShowForgotPasscode(false); 
-              setNewPasscode(''); 
-              setConfirmPasscode(''); 
-              setTempIdNumber(''); 
-              setIdVerified(false); 
-              setError(null); 
-              setPasscode('');
-              window.scrollTo(0, 0); // Reset scroll to top
-            }} style={{ ...buttonStyle, background: '#6b7280' }}>Cancel</button>
-          </div>
-        </div>
-      )
-    }
-  }
+    window.addEventListener('navigateToMonth', handleNavigateToMonth as EventListener);
+    return () => window.removeEventListener('navigateToMonth', handleNavigateToMonth as EventListener);
+  }, [schedule, specialDates, dateNotes]);
+  
+  // Listen for tab switch requests
+  useEffect(() => {
+    const handleSwitchToCalendar = () => {
+      setActiveTab('calendar');
+      // Force refresh when switching to calendar after export
+      setRefreshKey(prev => prev + 1);
+    };
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
-      <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: 420, display: 'grid', gap: '12px' }}>
-        {/* Animated Staff Sign In Header with GSAP */}
-        <h2 
-          ref={headerRef}
-          style={{ 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            backgroundSize: '200% auto',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            fontSize: '28px',
-            fontWeight: '700',
-            margin: '0 0 12px 0',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            MozUserSelect: 'none',
-            msUserSelect: 'none',
-            display: 'inline-block'
-          }}
-        >
-          Staff Sign In
-        </h2>
-        {showIdField !== false && (
-          <input 
-            placeholder="ID Number" 
-            value={idNumber} 
-            onChange={e => setIdNumber(e.target.value.toUpperCase())} 
-            style={inputStyle} 
-            autoCapitalize="characters"
-            onKeyDown={e => {
-              // Prevent Enter key from submitting the form
-              if (e.key === 'Enter') {
-                e.preventDefault();
+    const handleDebugCalendarState = () => {
+    };
+    window.addEventListener('switchToCalendarTab', handleSwitchToCalendar);
+    window.addEventListener('debugCalendarState', handleDebugCalendarState);
+    return () => {
+      window.removeEventListener('switchToCalendarTab', handleSwitchToCalendar);
+      window.removeEventListener('debugCalendarState', handleDebugCalendarState);
+    };
+  }, [schedule, specialDates, currentDate, dateNotes]);
+  
+  // Initialize content animation when component mounts
+  useEffect(() => {
+    if (contentRef.current && showMainApp) {
+      gsap.fromTo(contentRef.current,
+        {
+          opacity: 0,
+          y: 30,
+          scale: 0.95,
+          force3D: true
+        },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.8,
+          ease: "power2.out",
+          force3D: true
+        }
+      );
+    }
+  }, [showMainApp]);
+
+  const handleTabChange = (newTab: 'calendar' | 'settings' | 'data' | 'profile') => {
+    // Immediately update the active tab state for instant UI feedback
+    setActiveTab(newTab);
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate(new Date(currentYear, currentMonth + (direction === 'next' ? 1 : -1), 1));
+  };
+
+  const formatDateKey = (day: number) => {
+    return `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  };
+
+  const handleDateClick = (day: number) => {
+    const dateKey = formatDateKey(day);
+    setSelectedDate(dateKey);
+    setShowModal(true);
+  };
+
+  const canSelectShift = (shiftId: string, dateKey: string) => {
+    const currentShifts = schedule[dateKey] || [];
+    
+    // 9-4 and 12-10 cannot overlap
+    if (shiftId === '9-4' && currentShifts.includes('12-10')) return false;
+    if (shiftId === '12-10' && currentShifts.includes('9-4')) return false;
+    
+    // 12-10 and 4-10 cannot overlap
+    if (shiftId === '12-10' && currentShifts.includes('4-10')) return false;
+    if (shiftId === '4-10' && currentShifts.includes('12-10')) return false;
+    
+    return true;
+  };
+
+  const toggleShift = (shiftId: string) => {
+    if (!selectedDate) return;
+    
+    const currentShifts = schedule[selectedDate] || [];
+    
+    if (currentShifts.includes(shiftId)) {
+      // Remove shift
+      const updatedShifts = currentShifts.filter(id => id !== shiftId);
+      setSchedule(prev => ({
+        ...prev,
+        [selectedDate]: updatedShifts.length > 0 ? updatedShifts : []
+      }));
+    } else {
+      // Add shift if allowed
+      if (canSelectShift(shiftId, selectedDate)) {
+        setSchedule(prev => ({
+          ...prev,
+          [selectedDate]: [...currentShifts, shiftId]
+        }));
+      }
+    }
+    
+    // FIXED: Force refresh calculations when shifts change
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const handleUpdateNote = (dateKey: string, note: string) => {
+    setDateNotes(prev => ({
+      ...prev,
+      [dateKey]: note
+    }));
+  };
+
+  // Render the appropriate tab content
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'calendar':
+        // Use user's surname as schedule title if user is logged in
+        const currentScheduleTitle = user?.surname ? `${user.surname}'s Schedule` : scheduleTitle;
+        // Get monthly salary for current viewing month
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        const monthKey = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`;
+        const currentMonthlySalary = monthlySalaries[monthKey] || 0;
+        return (
+          <Calendar
+            currentDate={currentDate}
+            schedule={schedule}
+            specialDates={specialDates}
+            dateNotes={dateNotes}
+            onDateClick={handleDateClick}
+            onNavigateMonth={navigateMonth}
+            totalAmount={totalAmount}
+            monthToDateAmount={monthToDateAmount}
+            onDateChange={setCurrentDate}
+            scheduleTitle={currentScheduleTitle}
+            onTitleUpdate={setScheduleTitle}
+            setSchedule={setSchedule}
+            setSpecialDates={setSpecialDates}
+            setDateNotes={setDateNotes}
+            monthlySalary={currentMonthlySalary}
+            onMonthlySalaryChange={handleMonthlySalaryChange}
+            globalSalary={settings.basicSalary}
+          />
+        );
+      case 'settings':
+        return (
+          <SettingsPanel
+            settings={settings}
+            useManualMode={settings.useManualMode}
+            onUpdateBasicSalary={(salary) => setSettings(prev => ({ ...prev, basicSalary: salary }))}
+            onUpdateShiftHours={(combinationId, hours) => {
+              setSettings(prev => ({
+                ...prev,
+                shiftCombinations: prev.shiftCombinations.map(comb => 
+                  comb.id === combinationId ? { ...comb, hours } : comb
+                )
+              }));
+            }}
+            onToggleManualMode={(enabled) => setSettings(prev => ({ ...prev, useManualMode: enabled }))}
+            onUpdateManualAmount={(combinationId, manualAmount) => {
+              setSettings(prev => ({
+                ...prev,
+                shiftCombinations: prev.shiftCombinations.map(comb => 
+                  comb.id === combinationId 
+                    ? { ...comb, manualAmount, useManualAmount: true }
+                    : comb
+                )
+              }));
+            }}
+          />
+        );
+      case 'data':
+        return (
+          <MenuPanel 
+            onImportData={(data) => {
+              // Handle data import
+              if (data.schedule) setSchedule(data.schedule);
+              if (data.specialDates) setSpecialDates(data.specialDates);
+              if (data.dateNotes) setDateNotes(data.dateNotes);
+              if (data.settings) setSettings(data.settings);
+              if (data.scheduleTitle) setScheduleTitle(data.scheduleTitle);
+              setRefreshKey(prev => prev + 1); // Force refresh calculations
+            }}
+            onExportData={async () => {
+              // Export IndexedDB data
+              try {
+                // Get current user for filename (surname only, no ID number)
+                const userName = user ? `${user.surname || 'User'}` : 'User';
+                
+                // Simple export of the schedule and settings data
+                const exportData = {
+                  schedule,
+                  specialDates,
+                  dateNotes,
+                  settings,
+                  scheduleTitle,
+                  exportDate: new Date().toISOString(),
+                  version: '1.0'
+                };
+                
+                // Format filename: NARAYYA_Schedule_dd-mm-yyyy_HH-MM.json
+                const now = new Date();
+                const day = now.getDate().toString().padStart(2, '0');
+                const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                const year = now.getFullYear();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                
+                const exportFileDefaultName = `${userName}_Schedule_${day}-${month}-${year}_${hours}-${minutes}.json`;
+                
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                
+                // Show success message via custom event or callback
+                console.log('Export successful:', exportFileDefaultName);
+              } catch (error: unknown) {
+                console.error('Export failed:', error);
+                alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
               }
             }}
           />
-        )}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <input 
-            placeholder="4-digit Passcode" 
-            value={passcode} 
-            onChange={e => setPasscode(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-            style={{ ...inputStyle, flex: 1, paddingRight: '45px' }} 
-            type={showPasscode ? 'text' : 'password'}
-            inputMode="numeric" 
-            maxLength={4}
+        );
+      case 'profile':
+        // Convert user session to profile format for ProfileTab
+        const userProfile: UserProfile = user ? {
+          id: user.userId,
+          idNumber: user.idNumber,
+          surname: '', // Would need to fetch from backend
+          name: '', // Would need to fetch from backend
+          isAdmin: user.isAdmin
+        } : null;
+        return <ProfileTab user={userProfile} onLoginSuccess={onLoginSuccess} />;
+      default:
+        return (
+          <Calendar
+            currentDate={currentDate}
+            schedule={schedule}
+            specialDates={specialDates}
+            dateNotes={dateNotes}
+            onDateClick={handleDateClick}
+            onNavigateMonth={navigateMonth}
+            totalAmount={totalAmount}
+            monthToDateAmount={monthToDateAmount}
+            onDateChange={setCurrentDate}
+            scheduleTitle={scheduleTitle}
+            onTitleUpdate={setScheduleTitle}
+            setSchedule={setSchedule}
+            setSpecialDates={setSpecialDates}
+            setDateNotes={setDateNotes}
+            monthlySalary={0}
+            globalSalary={settings.basicSalary}
           />
-          <button
-            type="button"
-            onMouseDown={() => setShowPasscode(true)}
-            onMouseUp={() => setShowPasscode(false)}
-            onMouseLeave={() => setShowPasscode(false)}
-            onTouchStart={() => setShowPasscode(true)}
-            onTouchEnd={() => setShowPasscode(false)}
-            style={{
-              position: 'absolute',
-              right: '10px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '8px',
-              fontSize: '18px',
-              color: '#6b7280',
-              userSelect: 'none',
-              WebkitUserSelect: 'none'
-            }}
-          >
-            {showPasscode ? '🙈' : '👁️'}
-          </button>
+        );
+    }
+  };
+
+  // Loading screen
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Animated background elements */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 20%), radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 20%)',
+          zIndex: 0
+        }}></div>
+        
+        <div style={{
+          position: 'relative',
+          zIndex: 1,
+          textAlign: 'center',
+          maxWidth: 400,
+          padding: 20
+        }}>
+          {/* GIF Splash Screen */}
+          <div style={{
+            width: 200,
+            height: 200,
+            margin: '0 auto 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '20px',
+            overflow: 'hidden'
+          }}>
+            {/* Animated Logo with Pulse Effect */}
+            <div style={{
+              position: 'relative',
+              width: 120,
+              height: 120,
+              animation: 'pulse-bounce 1.5s ease-in-out infinite'
+            }}>
+              {/* Main logo container */}
+              <div style={{
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                borderRadius: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 20px 60px -20px rgba(99, 102, 241, 0.5)',
+                animation: 'gradient-shift 3s ease infinite',
+                backgroundSize: '200% 200%'
+              }}>
+                {/* Calendar Icon */}
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" style={{
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                }}>
+                  <path d="M8 7V3M16 7V3M7 11H17M5 21H19C20.1046 21 21 20.1046 21 19V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V19C3 20.1046 3.89543 21 5 21Z" 
+                        stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                
+                {/* Rotating ring around logo */}
+                <div style={{
+                  position: 'absolute',
+                  width: '140%',
+                  height: '140%',
+                  border: '3px solid transparent',
+                  borderTop: '3px solid rgba(255,255,255,0.3)',
+                  borderBottom: '3px solid rgba(255,255,255,0.3)',
+                  borderRadius: '50%',
+                  animation: 'spin 2s linear infinite'
+                }}></div>
+              </div>
+              
+              {/* Ripple effect */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                border: '2px solid rgba(99, 102, 241, 0.5)',
+                animation: 'ripple 1.5s ease-out infinite'
+              }}></div>
+            </div>
+            
+            {/* Add CSS animations */}
+            <style>{`
+              @keyframes pulse-bounce {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+              @keyframes ripple {
+                0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+                100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+              }
+              @keyframes gradient-shift {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+              }
+            `}</style>
+          </div>
+          
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            color: '#1e293b',
+            marginBottom: 8
+          }}>
+            Loading App
+          </h1>
+          
+          <p style={{
+            fontSize: '14px',
+            color: '#64748b',
+            marginBottom: 24
+          }}>
+            Preparing your calendar and settings...
+          </p>
+          
+             <h1 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#1e293b',
+            marginBottom: 8
+          }}>
+            Created By NARAYYA
+          </h1>
+          
+          
+          
+          
+          <div style={{
+            width: '100%',
+            height: 8,
+            backgroundColor: '#e2e8f0',
+            borderRadius: 4,
+            overflow: 'hidden',
+            marginBottom: 8
+          }}>
+            <div 
+              style={{
+                height: '100%',
+                width: `${smoothProgress}%`,
+                backgroundColor: '#6366f1',
+                borderRadius: 4,
+                transition: 'width 0.1s linear',
+                minWidth: '1%'
+              }}
+            ></div>
+          </div>
+          
+          <div style={{
+            fontSize: '12px',
+            color: '#94a3b8'
+          }}>
+            {smoothProgress}%
+          </div>
         </div>
-        {error && <div style={{ color: 'red', textAlign: 'center' }}>{error}</div>}
-        <button type="submit" style={buttonStyle}>Login</button>
-      </form>
-      <div style={{ display: 'grid', gap: '8px', width: '100%', maxWidth: 420, marginTop: '16px' }}>
-        <AnimatedRegistrationButton onClick={() => onRegister && onRegister()} />
-        <button type="button" onClick={() => {
-          console.log('Forgot Passcode button clicked');
-          setError(null); // Clear any existing error when navigating to forgot passcode
-          setShowForgotPasscode(true);
-        }} style={{ ...buttonStyle, background: '#ef4444' }}>Forgot Passcode</button>
       </div>
+    );
+  }
+
+  // Main app content
+  return (
+    <div ref={contentRef} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Tab Navigation */}
+      <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+      
+      {/* Main Content */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {renderTabContent()}
+      </div>
+      
+      {/* Modals and Popups - Rendered via Portal to avoid scroll issues */}
+      {showModal && selectedDate && typeof document !== 'undefined' && createPortal(
+        <ShiftModal
+          selectedDate={selectedDate}
+          schedule={schedule}
+          specialDates={specialDates}
+          dateNotes={dateNotes}
+          onClose={() => setShowModal(false)}
+          onToggleShift={toggleShift}
+          onUpdateNote={handleUpdateNote}
+          onToggleSpecialDate={(dateKey: string, isSpecial: boolean) => {
+            setSpecialDates(prev => ({
+              ...prev,
+              [dateKey]: isSpecial
+            }));
+            setRefreshKey(prev => prev + 1);
+          }}
+        />,
+        document.body
+      )}
     </div>
-  )
+  );
 }
 
-const inputStyle: React.CSSProperties = {
-  padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, textAlign: 'center'
-}
-const buttonStyle: React.CSSProperties = {
-  padding: '12px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: 'white', fontWeight: 600, cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none'
-}
-
-// Character-by-character slide reveal animation for Registration button
-export default StaffLogin
+export default App;
