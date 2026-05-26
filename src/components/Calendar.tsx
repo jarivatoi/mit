@@ -712,28 +712,9 @@ export const Calendar: React.FC<CalendarProps> = ({
       }}>
         <div className="flex items-center justify-center space-x-3 mb-4">
           <CalendarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
-          {isEditingTitle ? (
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={tempTitle}
-                onChange={(e) => setTempTitle(e.target.value)}
-                onKeyDown={handleTitleKeyPress}
-                onBlur={handleTitleSave}
-                className="text-xl sm:text-3xl font-bold text-gray-900 text-center bg-transparent border-b-2 border-indigo-500 focus:outline-none min-w-[250px] sm:min-w-[300px]"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <button
-              onClick={handleTitleClick}
-              className="flex items-center space-x-2 text-xl sm:text-3xl font-bold text-gray-900 text-center hover:text-indigo-600 transition-colors duration-200 group select-none"
-              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-            >
-              <span className="select-none">{scheduleTitle}</span>
-              <Edit3 className="w-4 h-4 sm:w-5 sm:h-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            </button>
-          )}
+          <div className="text-xl sm:text-3xl font-bold text-gray-900 text-center select-none" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
+            {scheduleTitle}
+          </div>
         </div>
         
         {/* Month/Year Navigation */}
