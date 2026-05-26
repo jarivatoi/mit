@@ -595,6 +595,15 @@ export const Calendar: React.FC<CalendarProps> = ({
           return newSpecialDates;
         });
         
+        // Clear date notes for the month
+        setDateNotes(prev => {
+          const newDateNotes = { ...prev };
+          monthDateKeys.forEach(dateKey => {
+            delete newDateNotes[dateKey];
+          });
+          return newDateNotes;
+        });
+        
         console.log(`✅ Successfully cleared month ${month + 1}/${year}`);
         resolve();
       } catch (error) {
