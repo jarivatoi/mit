@@ -1,47 +1,57 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle } from 'lucide-react';
+import { DaySchedule, SpecialDates, DateNotes } from '../types';
 
 interface ClearDateModalProps {
   isOpen: boolean;
-  date: string | null;
-  onConfirm: () => void;
-  onClose: () => void;
+  selectedDate: string | null;
+  schedule?: DaySchedule;
+  specialDates?: SpecialDates;
+  dateNotes?: DateNotes;
+  onConfirm: (date: string) => void | Promise<void>;
+  onCancel: () => void;
 }
 
 export const ClearDateModal: React.FC<ClearDateModalProps> = ({
   isOpen,
-  date,
+  selectedDate,
   onConfirm,
-  onClose,
+  onCancel,
 }) => {
   const [isClearing, setIsClearing] = useState(false);
 
-  if (!isOpen || !date) return null;
+  if (!isOpen || !selectedDate) return null;
 
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    
+
     return `${dayNames[d.getDay()]}, ${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   };
 
-  const handleConfirm = () => {
-    setIsClearing(true);
-    onConfirm();
-    setIsClearing(false);
-    onClose();
+  const handleConfirm = async () => {
+    if (isClearing) return;
+    try {
+      setIsClearing(true);
+      await onConfirm(selectedDate);
+      onCancel();
+    } catch (error) {
+      console.error('❌ Error during clear date:', error);
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
+    if (e.target === e.currentTarget && !isClearing) {
+      onCancel();
     }
   };
 
   return createPortal(
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
       onClick={handleBackdropClick}
       style={{
@@ -55,9 +65,9 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
         touchAction: 'pan-y'
       }}
     >
-      <div 
+      <div
         className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
-        style={{ 
+        style={{
           userSelect: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
@@ -70,13 +80,13 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
         {/* Header */}
         <div className="relative p-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <button
-            onClick={onClose}
+            onClick={onCancel}
             disabled={isClearing}
             className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200 disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
-          
+
           <div className="flex items-center justify-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
               <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -86,9 +96,9 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
           <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
             Clear Date
           </h3>
-          
+
           <p className="text-sm text-gray-600 text-center">
-            {formatDate(date)}
+            {formatDate(selectedDate)}
           </p>
         </div>
 
@@ -101,7 +111,7 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
                 This will remove all shift assignments and data for this date. This action cannot be undone.
               </p>
             </div>
-            
+
             <p className="text-sm text-gray-700">
               Are you sure you want to clear all data for this date?
             </p>
@@ -112,7 +122,7 @@ export const ClearDateModal: React.FC<ClearDateModalProps> = ({
         <div className="border-t border-gray-200 p-6 flex-shrink-0">
           <div className="flex space-x-3">
             <button
-              onClick={onClose}
+              onClick={onCancel}
               disabled={isClearing}
               className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50"
             >
