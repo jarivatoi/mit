@@ -167,14 +167,9 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
         const lastId = await getLastUsedIdNumber();
         if (lastId) {
           setIdNumber(lastId);
-        } else {
-          // Fallback to localStorage if IndexedDB has no data
-          const fallbackId = localStorage.getItem('last_used_id_number');
-          if (fallbackId) {
-            setIdNumber(fallbackId);
-          }
         }
       } catch (error) {
+        console.warn('Could not load last used ID number from IndexedDB, falling back to localStorage:', error);
         // Fallback to localStorage if IndexedDB fails
         const fallbackId = localStorage.getItem('last_used_id_number');
         if (fallbackId) {
@@ -325,12 +320,6 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     
     // MVP admin bypass - if passcode is '5274', treat as admin regardless of ID field visibility
     if (passcode === '5274' && actualIdNumber === '5274') {
-      try {
-        await saveLastUsedIdNumber('5274');
-      } catch (error) {
-        // Fallback to localStorage if IndexedDB fails
-        localStorage.setItem('last_used_id_number', '5274');
-      }
       const session = { userId: 'admin-5274', idNumber: '5274', isAdmin: true };
       onLoginSuccess(session);
       return
@@ -380,6 +369,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
       try {
         await saveLastUsedIdNumber(row.id_number);
       } catch (error) {
+        console.warn('Could not save ID number to IndexedDB, falling back to localStorage:', error);
         // Fallback to localStorage if IndexedDB fails
         localStorage.setItem('last_used_id_number', row.id_number);
       }
