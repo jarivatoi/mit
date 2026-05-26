@@ -1,24 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Calculator, Edit3, TrendingUp, Trash2, AlertTriangle, X } from 'lucide-react';
-import { Download } from 'lucide-react';
 import { gsap } from 'gsap';
 import { SHIFTS } from '../constants';
-import { DaySchedule, SpecialDates, DateNotes } from '../types';
+import { DaySchedule, SpecialDates } from '../types';
 import { ClearDateModal } from './ClearDateModal';
-import { ClearMonthModal } from './ClearMonthModal';
+import { DeleteMonthModal } from './DeleteMonthModal';
 import { MonthClearModal } from './MonthClearModal';
-import { ScrollingText } from './ScrollingText';
-// Calendar export modal removed
 import { formatMauritianRupees } from '../utils/currency';
 import { useLongPress } from '../hooks/useLongPress';
-
 
 interface CalendarProps {
   currentDate: Date;
   schedule: DaySchedule;
   specialDates: SpecialDates;
-  dateNotes: DateNotes;
+  settings: any; // Add settings prop to access custom shifts
   onDateClick: (day: number) => void;
   onNavigateMonth: (direction: 'prev' | 'next') => void;
   totalAmount: number;
@@ -29,17 +25,13 @@ interface CalendarProps {
   onResetMonth?: (year: number, month: number) => void;
   setSchedule: React.Dispatch<React.SetStateAction<DaySchedule>>;
   setSpecialDates: React.Dispatch<React.SetStateAction<SpecialDates>>;
-  setDateNotes: React.Dispatch<React.SetStateAction<DateNotes>>;
-  monthlySalary?: number;
-  onMonthlySalaryChange?: (year: number, month: number, salary: number) => void;
-  globalSalary?: number;
 }
 
 export const Calendar: React.FC<CalendarProps> = ({
   currentDate,
   schedule,
   specialDates,
-  dateNotes,
+  settings,
   onDateClick,
   onNavigateMonth,
   totalAmount,
@@ -48,11 +40,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   scheduleTitle,
   onTitleUpdate,
   setSchedule,
-  setSpecialDates,
-  setDateNotes,
-  monthlySalary = 0,
-  onMonthlySalaryChange,
-  globalSalary = 0
+  setSpecialDates
 }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -60,18 +48,10 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [showClearDateModal, setShowClearDateModal] = useState(false);
   const [showClearMonthModal, setShowClearMonthModal] = useState(false);
   const [showMonthClearModal, setShowMonthClearModal] = useState(false);
-  // Removed: external calendar export modal state
   const [dateToDelete, setDateToDelete] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPressActive, setIsLongPressActive] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importAuthCode, setImportAuthCode] = useState('');
-  const [importAuthError, setImportAuthError] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResults, setImportResults] = useState<{added: number, skipped: number, errors: number} | null>(null);
-  const [tempMonthlySalary, setTempMonthlySalary] = useState('');
   const calendarGridRef = useRef<HTMLDivElement>(null);
-  const animatedElementsRef = useRef<Set<HTMLElement>>(new Set());
   
   const today = new Date();
   const currentMonth = currentDate.getMonth();
@@ -81,12 +61,6 @@ export const Calendar: React.FC<CalendarProps> = ({
   const firstDayWeekday = firstDayOfMonth.getDay();
   const daysInMonth = lastDayOfMonth.getDate();
 
-  // Only apply global salary to current year ONLY (not past or future)
-  // This prevents past years from changing when global salary is updated
-  const isFutureYear = currentYear > today.getFullYear();
-  const isPastYear = currentYear < today.getFullYear();
-  const shouldUseGlobalSalary = monthlySalary === 0 && !isFutureYear && !isPastYear;
-
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
@@ -94,21 +68,9 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Auto-refresh effect for month-to-date calculation
-  useEffect(() => {
-    // Set up interval to refresh every minute
-    const interval = setInterval(() => {
-      // This will trigger a re-render by updating a dummy state or through other means
-      // In this case, we'll just log that a refresh check happened
-      console.log('🕒 Auto-refresh check for month-to-date value');
-    }, 60000); // Refresh every minute
-
-    return () => clearInterval(interval);
-  }, []);
-
   // Prevent body scroll when date picker modal is open - EXACTLY LIKE OTHER MODALS
   useEffect(() => {
-    if (showDatePicker || showImportModal) {
+    if (showDatePicker) {
       // Disable body scroll
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
@@ -127,15 +89,12 @@ export const Calendar: React.FC<CalendarProps> = ({
       document.body.style.right = '';
       document.body.style.bottom = '';
     };
-  }, [showDatePicker, showImportModal]);
+  }, [showDatePicker]);
 
-  // Enhanced TweenMax animations with smooth easing
+  // Mobile-optimized sequential animation - smoother for iOS
   useEffect(() => {
     if (calendarGridRef.current) {
-      // Clear previous animated elements
-      animatedElementsRef.current.clear();
-      
-      // Get all day boxes and sort them by day number
+      // Get all day boxes and sort them by day number for sequential animation
       const dayBoxes = Array.from(calendarGridRef.current.querySelectorAll('.day-box'))
         .filter(box => box.getAttribute('data-day') !== null)
         .sort((a, b) => {
@@ -144,152 +103,104 @@ export const Calendar: React.FC<CalendarProps> = ({
           return dayA - dayB;
         });
       
-      // Set initial state with hardware acceleration
+      // Force hardware acceleration and set initial state - iOS optimized
       gsap.set(dayBoxes, {
         opacity: 0,
-        x: 30,  // Slide from right
-        scale: 0.95,
+        x: 80,  // Reduced distance for smoother mobile performance
+        scale: 0.9,
         force3D: true,  // Force hardware acceleration
         transformOrigin: "center center"
       });
 
-      // Set initial state for shift texts (avoid interfering with ScrollingText)
+      // Set initial state for shift texts - optimized for mobile
       const shiftTexts = calendarGridRef.current.querySelectorAll('.shift-text');
       gsap.set(shiftTexts, {
         opacity: 0,
-        x: 10,  // Slide from right
-        scale: 0.9,
+        y: 8,   // Reduced movement for smoother animation
+        scale: 0.8,
         force3D: true
       });
 
-      // Set initial state for special text (avoid interfering with ScrollingText)
+      // Set initial state for special text
       const specialTexts = calendarGridRef.current.querySelectorAll('.special-text');
       gsap.set(specialTexts, {
         opacity: 0,
-        scale: 0.9,
-        x: 15,  // Slide from right
+        scale: 0.7,
+        y: -8,
         force3D: true
       });
 
-      // Create master timeline with smooth TweenMax-style easing
+      // Create master timeline with mobile-optimized settings
       const masterTl = gsap.timeline({
         defaults: {
-          ease: "power2.out",  // Smooth TweenMax-style easing
+          ease: "power2.out",  // Smoother easing for mobile
           force3D: true
         }
       });
 
-      // Animate boxes with staggered entrance
+      // Phase 1: Animate boxes sequentially - optimized timing for mobile
       dayBoxes.forEach((box, index) => {
         const dayNumber = parseInt(box.getAttribute('data-day') || '0');
         const shiftElements = box.querySelectorAll('.shift-text');
         const specialElements = box.querySelectorAll('.special-text');
         
-        // Add to animated elements tracking
-        animatedElementsRef.current.add(box as HTMLElement);
+        // Faster sequence for mobile - reduced delay
+        const delay = (dayNumber - 1) * 0.05; // 50ms between each day (faster)
         
-        // Smooth sequence timing
-        const delay = (dayNumber - 1) * 0.04; // 40ms between each day
-        
-        // Animate the main box with smooth entrance
+        // Animate the box - smoother for mobile
         masterTl.to(box, {
           opacity: 1,
-          x: 0,  // Slide to final position
+          x: 0,
           scale: 1,
-          duration: 0.6,
-          delay: delay,
-          ease: "back.out(1.2)" // Smooth bounce-back effect
-        }, 0);
+          duration: 0.4,  // Shorter duration
+          ease: "power2.out",  // Simpler easing
+          force3D: true
+        }, delay);
 
-        // Animate shift texts (without interfering with ScrollingText)
+        // Animate shift texts - simplified for mobile
         if (shiftElements.length > 0) {
-          shiftElements.forEach(el => animatedElementsRef.current.add(el as HTMLElement));
           masterTl.to(shiftElements, {
             opacity: 1,
-            x: 0,  // Slide to final position
+            y: 0,
             scale: 1,
-            duration: 0.4,
-            stagger: 0.06,
-            ease: "power2.out"
-          }, delay + 0.1);
-        }
-
-        // Animate special texts (without interfering with ScrollingText)
-        if (specialElements.length > 0) {
-          specialElements.forEach(el => animatedElementsRef.current.add(el as HTMLElement));
-          masterTl.to(specialElements, {
-            opacity: 1,
-            x: 0,  // Slide to final position
-            scale: 1,
-            duration: 0.4,
-            ease: "elastic.out(1, 0.5)" // Gentle elastic effect
+            duration: 0.3,
+            ease: "power1.out",  // Gentler easing
+            stagger: 0.03,  // Faster stagger
+            force3D: true
           }, delay + 0.15);
         }
-      });
-      
-      // Add hover animations for interactive elements
-      dayBoxes.forEach(box => {
-        const dayElement = box as HTMLElement;
-        
-        // Hover enter animation
-        dayElement.addEventListener('mouseenter', () => {
-          if (animatedElementsRef.current.has(dayElement)) {
-            gsap.to(dayElement, {
-              scale: 1.02,
-              duration: 0.2,
-              ease: "power2.out"
-            });
-          }
-        });
-        
-        // Hover leave animation
-        dayElement.addEventListener('mouseleave', () => {
-          if (animatedElementsRef.current.has(dayElement)) {
-            gsap.to(dayElement, {
-              scale: 1,
-              duration: 0.2,
-              ease: "power2.out"
-            });
-          }
-        });
-        
-        // Click animation
-        dayElement.addEventListener('click', () => {
-          if (animatedElementsRef.current.has(dayElement)) {
-            gsap.to(dayElement, {
-              scale: 0.98,
-              duration: 0.1,
-              ease: "power2.out",
-              yoyo: true,
-              repeat: 1
-            });
-          }
-        });
+
+        // Animate special text - simplified
+        if (specialElements.length > 0) {
+          masterTl.to(specialElements, {
+            opacity: 1,
+            scale: 1,
+            y: 0,
+            duration: 0.25,
+            ease: "power1.out",
+            force3D: true
+          }, delay + 0.2);
+        }
       });
     }
-  }, [currentDate, schedule, specialDates]);
+  }, [currentMonth, currentYear]);
 
   // Close modal on escape key - EXACTLY LIKE SHIFT MODAL
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setShowDatePicker(false);
-        setShowImportModal(false);
       }
     };
 
-    if (showDatePicker || showImportModal) {
+    if (showDatePicker) {
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
-  }, [showDatePicker, showImportModal]);
+  }, [showDatePicker]);
 
   // Close date picker when clicking outside - EXACTLY LIKE OTHER MODALS
   const handleDatePickerBackdropClick = (e: React.MouseEvent) => {
-    // Prevent immediate closing on Android
-    e.preventDefault();
-    e.stopPropagation();
-    
     if (e.target === e.currentTarget) {
       setShowDatePicker(false);
     }
@@ -300,16 +211,14 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const isToday = (day: number) => {
-    const now = new Date();
-    return now.getDate() === day && 
-           now.getMonth() === currentMonth && 
-           now.getFullYear() === currentYear;
+    return today.getDate() === day && 
+           today.getMonth() === currentMonth && 
+           today.getFullYear() === currentYear;
   };
 
   const isPastDate = (day: number) => {
-    const now = new Date();
     const dateToCheck = new Date(currentYear, currentMonth, day);
-    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     return dateToCheck < todayDate;
   };
 
@@ -331,13 +240,6 @@ export const Calendar: React.FC<CalendarProps> = ({
     const dateKey = formatDateKey(day);
     const shifts = schedule[dateKey] || [];
     
-    // Debug logging for specific dates that should have data
-    if (day === 1 || day === 2 || day === 21) {
-      console.log(`📅 CALENDAR DEBUG: Day ${day} (${dateKey}) has shifts:`, shifts);
-      console.log(`📅 CALENDAR DEBUG: Current month/year: ${currentMonth + 1}/${currentYear}`);
-      console.log(`📅 CALENDAR DEBUG: Schedule keys:`, Object.keys(schedule));
-    }
-    
     // Sort shifts in the desired display order: 9-4, 4-10, 12-10, N
     const shiftOrder = ['9-4', '4-10', '12-10', 'N'];
     return shifts.sort((a, b) => {
@@ -352,13 +254,26 @@ export const Calendar: React.FC<CalendarProps> = ({
     });
   };
 
-  const getDateNote = (day: number) => {
-    const dateKey = formatDateKey(day);
-    return dateNotes[dateKey] || '';
-  };
-
   const getShiftDisplay = (shiftId: string) => {
-    return SHIFTS.find(shift => shift.id === shiftId);
+    // First check if it's a predefined shift
+    const predefinedShift = SHIFTS.find(shift => shift.id === shiftId);
+    if (predefinedShift) {
+      return predefinedShift;
+    }
+    
+    // Then check if it's a custom shift
+    const customShift = settings?.customShifts?.find(shift => shift.id === shiftId);
+    if (customShift) {
+      return {
+        id: customShift.id,
+        label: customShift.label,
+        time: customShift.label,
+        color: 'bg-purple-100 text-purple-800 border-purple-200',
+        displayColor: 'text-purple-600'
+      };
+    }
+    
+    return null;
   };
 
   const getDateTextColor = (day: number) => {
@@ -396,6 +311,42 @@ export const Calendar: React.FC<CalendarProps> = ({
     };
   };
 
+  // Long-press handlers for month header
+  const longPressHandlers = useLongPress({
+    onLongPress: () => {
+      setIsLongPressActive(true);
+      // Only show modal if month has data to clear
+      if (hasMonthData()) {
+        setShowMonthClearModal(true);
+      }
+      // Reset flag after a delay
+      setTimeout(() => setIsLongPressActive(false), 500);
+    },
+    onPress: () => {
+      // Only trigger single press if long press wasn't active
+      if (!isLongPressActive) {
+        setTimeout(() => {
+          if (!isLongPressActive) {
+            setShowDatePicker(true);
+          }
+        }, 50);
+      }
+    },
+    delay: 500
+  });
+
+  // Fallback click handler for Android devices
+  const handleMonthYearFallbackClick = (e: React.MouseEvent) => {
+    // Only handle if it's a mouse click (not touch) and no long press is active
+    if (e.type === 'click' && !isLongPressActive) {
+      setTimeout(() => {
+        if (!isLongPressActive && !showDatePicker) {
+          setShowDatePicker(true);
+        }
+      }, 100);
+    }
+  };
+
   // Check if current month has any data (shifts or special dates)
   const hasMonthData = () => {
     // Check for shifts in current month
@@ -415,52 +366,11 @@ export const Calendar: React.FC<CalendarProps> = ({
              isSpecial === true;
     });
     
-    // Check for notes in current month
-    const hasNotes = Object.entries(dateNotes).some(([dateKey, note]) => {
-      const workDate = new Date(dateKey);
-      return workDate.getMonth() === currentMonth && 
-             workDate.getFullYear() === currentYear && 
-             note && note.trim() !== '';
-    });
-    
-    return hasShifts || hasSpecialDates || hasNotes;
+    return hasShifts || hasSpecialDates;
   };
 
-  // Long-press handlers for month header
-  const longPressHandlers = useLongPress({
-    onLongPress: () => {
-      setIsLongPressActive(true);
-      // Only show modal if month has data to clear
-      if (hasMonthData()) {
-        setShowMonthClearModal(true);
-      }
-      // Reset flag after a delay
-      setTimeout(() => setIsLongPressActive(false), 500);
-    },
-    onPress: () => {
-      // Only trigger single press if long press wasn't active
-      if (!isLongPressActive) {
-        setTimeout(() => {
-          if (!isLongPressActive) {
-            setShowDatePicker(true);
-            setTempMonthlySalary(monthlySalary > 0 ? monthlySalary.toString() : (shouldUseGlobalSalary ? globalSalary.toString() : '0'));
-          }
-        }, 50);
-      }
-    },
-    delay: 500
-  });
-
-  // Fallback click handler for Android devices
-  const handleMonthYearFallbackClick = (e: React.MouseEvent) => {
-    // Only handle if it's a mouse click (not touch) and no long press is active
-    if (e.type === 'click' && !isLongPressActive) {
-      setTimeout(() => {
-        if (!isLongPressActive && !showDatePicker) {
-          setShowDatePicker(true);
-        }
-      }, 100);
-    }
+  const handleMonthYearClick = () => {
+    setShowDatePicker(true);
   };
 
   const handleDatePickerChange = (year: number, month: number) => {
@@ -492,6 +402,23 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const handleDateClick = (day: number) => {
+    // Simplified click animation for mobile - no complex transforms
+    const clickedElement = document.querySelector(`[data-day="${day}"]`);
+    
+    if (clickedElement) {
+      // Simple, smooth scale animation
+      gsap.to(clickedElement, {
+        scale: 0.95,
+        duration: 0.1,
+        ease: "power2.out",
+        force3D: true,
+        yoyo: true,
+        repeat: 1,
+        onComplete: () => {
+          gsap.set(clickedElement, { scale: 1 });
+        }
+      });
+    }
     onDateClick(day);
   };
 
@@ -503,8 +430,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     // Check if date has content before showing modal
     const hasShifts = schedule[dateKey] && schedule[dateKey].length > 0;
     const isSpecial = specialDates[dateKey] === true;
-    const hasNote = dateNotes[dateKey] && dateNotes[dateKey].trim() !== '';
-    const hasContent = hasShifts || isSpecial || hasNote;
+    const hasContent = hasShifts || isSpecial;
     
     // Only show modal if date has content to clear
     if (!hasContent) {
@@ -543,13 +469,6 @@ export const Calendar: React.FC<CalendarProps> = ({
           const newSpecialDates = { ...prev };
           delete newSpecialDates[dateKey];
           return newSpecialDates;
-        });
-        
-        // Clear note for this specific date
-        setDateNotes(prev => {
-          const newDateNotes = { ...prev };
-          delete newDateNotes[dateKey];
-          return newDateNotes;
         });
         
         console.log(`✅ Successfully cleared date ${dateKey}`);
@@ -601,40 +520,34 @@ export const Calendar: React.FC<CalendarProps> = ({
     });
   };
 
-  // Handle roster import
-  const handleImportFromRoster = async () => {
-    // Roster import functionality removed - roster tab no longer exists
-    setImportAuthError('Roster import has been disabled');
-    setIsImporting(false);
-  };
-
-  const handleCloseImportModal = () => {
-    setShowImportModal(false);
-    setImportAuthCode('');
-    setImportAuthError('');
-    setImportResults(null);
-  };
-
-  // Debug function to log current calendar state
-  useEffect(() => {
-    console.log('📅 CALENDAR DEBUG: Current calendar state:', {
-      currentMonth: currentMonth + 1,
-      currentYear,
-      scheduleKeys: Object.keys(schedule),
-      scheduleEntries: Object.entries(schedule).slice(0, 5),
-      specialDatesKeys: Object.keys(specialDates),
-      totalScheduleEntries: Object.keys(schedule).length,
-      totalSpecialDates: Object.keys(specialDates).length,
-      sampleScheduleData: Object.entries(schedule).slice(0, 3).map(([date, shifts]) => ({
-        date,
-        shifts,
-        dayOfWeek: new Date(date).getDay()
-      }))
-    });
-  }, [schedule, specialDates, currentMonth, currentYear]);
-  
   const handleMonthNavigation = (direction: 'prev' | 'next') => {
-    onNavigateMonth(direction);
+    // Simplified month navigation for mobile
+    if (calendarGridRef.current) {
+      const slideDirection = direction === 'next' ? 30 : -30;
+      
+      gsap.to(calendarGridRef.current, {
+        x: slideDirection,
+        opacity: 0.5,
+        duration: 0.2,
+        ease: "power2.out",
+        force3D: true,
+        onComplete: () => {
+          onNavigateMonth(direction);
+          gsap.set(calendarGridRef.current, { 
+            x: direction === 'next' ? -30 : 30
+          });
+          gsap.to(calendarGridRef.current, {
+            x: 0,
+            opacity: 1,
+            duration: 0.3,
+            ease: "power2.out",
+            force3D: true
+          });
+        }
+      });
+    } else {
+      onNavigateMonth(direction);
+    }
   };
 
   // Check if current month/year matches today's month/year for month-to-date display
@@ -656,57 +569,57 @@ export const Calendar: React.FC<CalendarProps> = ({
   // Calculate number of rows needed
   const totalCells = calendarDays.length;
   const numberOfRows = Math.ceil(totalCells / 7);
-  
-  // Calculate square cell size based on viewport width
-  const getCellSize = () => {
-    const isDesktop = window.innerWidth >= 640;
-    const availableWidth = isDesktop ? window.innerWidth - 96 : window.innerWidth - 32; // Account for padding
-    const cellWidth = availableWidth / 7; // 7 columns
-    // Return actual cell width for perfect square, with reasonable minimums
-    return cellWidth < 50 ? 50 : cellWidth; // Only enforce minimum if extremely small
-  };
 
-  const cellSize = getCellSize();
-
-  // Resize listener to recalculate cell dimensions on zoom/window resize
-  useEffect(() => {
-    let resizeTimeout: NodeJS.Timeout | null = null;
+  // Calculate dynamic row heights based on content
+  const calculateRowHeights = () => {
+    const rowHeights: string[] = [];
     
-    const handleResize = () => {
-      // Debounce resize events to avoid excessive recalculations
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
+    for (let row = 0; row < numberOfRows; row++) {
+      let maxContentLines = 0;
+      
+      // Check each day in this row (7 days per row)
+      for (let col = 0; col < 7; col++) {
+        const dayIndex = row * 7 + col;
+        if (dayIndex < calendarDays.length) {
+          const day = calendarDays[dayIndex];
+          if (day) {
+            const dayShifts = getDayShifts(day);
+            const hasSpecial = isSpecialDate(day);
+            
+            // Count content lines: shifts + special text (if present)
+            // Maximum possible: SPECIAL (1 line) + 3 shifts (3 lines) = 4 total
+            let contentLines = dayShifts.length;
+            if (hasSpecial) contentLines += 1; // Add 1 line for "SPECIAL" text
+            
+            // Cap at maximum possible content (should never exceed 4)
+            contentLines = Math.min(contentLines, 4);
+            
+            maxContentLines = Math.max(maxContentLines, contentLines);
+          }
+        }
       }
       
-      resizeTimeout = setTimeout(() => {
-        // Force re-render by updating a dummy state
-        setShowDatePicker(prev => prev);
-      }, 150); // 150ms debounce
-    };
-
-    window.addEventListener('resize', handleResize);
+      // Calculate height based on maximum content lines in the row
+      const baseHeight = window.innerWidth >= 640 ? 60 : 50; // Base height for date number
+      const lineHeight = window.innerWidth >= 640 ? 16 : 12; // Reduced height per content line
+      const padding = window.innerWidth >= 640 ? 16 : 12; // Top/bottom padding
+      
+      const calculatedHeight = baseHeight + (maxContentLines * lineHeight) + padding;
+      const minHeight = window.innerWidth >= 640 ? 70 : 55; // Reduced minimum height
+      
+      const finalHeight = Math.max(calculatedHeight, minHeight);
+      rowHeights.push(`${finalHeight}px`);
+    }
     
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-    };
-  }, []);
+    return rowHeights;
+  };
+
+  const rowHeights = calculateRowHeights();
 
   return (
-    <div className="bg-white overflow-hidden select-none" style={{
-      userSelect: 'none', 
-      WebkitUserSelect: 'none',
-      width: '100vw',
-      marginLeft: 'calc(-50vw + 50%)',
-      marginRight: 'calc(-50vw + 50%)',
-    }}>
+    <div className="bg-white rounded-2xl shadow-lg overflow-hidden select-none max-w-4xl mx-auto" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
       {/* Header */}
-      <div className="border-b border-gray-200" style={{ 
-        padding: window.innerWidth >= 640 ? '24px' : '16px',
-        paddingTop: window.innerWidth >= 640 ? '24px' : '16px'
-      }}>
+      <div className="p-4 sm:p-6 border-b border-gray-200">
         <div className="flex items-center justify-center space-x-3 mb-4">
           <CalendarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
           {isEditingTitle ? (
@@ -764,7 +677,7 @@ export const Calendar: React.FC<CalendarProps> = ({
             <button
               {...longPressHandlers}
               onClick={handleMonthYearFallbackClick}
-             className="text-lg sm:text-xl font-bold text-gray-700 text-center px-3 sm:px-4 py-2 rounded-lg select-none"
+             className="text-lg sm:text-xl font-bold text-gray-900 select-none"
               style={{ 
                 userSelect: 'none', 
                 WebkitUserSelect: 'none',
@@ -804,271 +717,113 @@ export const Calendar: React.FC<CalendarProps> = ({
 
       {/* Date Picker Modal - NOW CENTERED VERTICALLY LIKE OTHER MODALS */}
       {showDatePicker && (
-        createPortal(
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={(e) => {
+            console.log('📱 Backdrop clicked');
+            handleDatePickerBackdropClick(e);
+          }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            pointerEvents: 'auto',
+            // CRITICAL: Enable touch scrolling on the backdrop
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y' // Allow vertical panning (scrolling)
+          }}
+        >
           <div 
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: window.innerWidth > window.innerHeight ? 'flex-start' : 'center',
-              justifyContent: 'center',
-              zIndex: 99999,
-              padding: window.innerWidth > window.innerHeight ? '8px' : '16px', // Less padding in landscape
-              paddingTop: window.innerWidth > window.innerHeight ? '4px' : '16px', // Minimal top padding in landscape
-              overflow: 'auto',
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-y',
-              // Critical: Fix Android touch issues
-              WebkitTouchCallout: 'none',
-              WebkitUserSelect: 'none',
-              userSelect: 'none'
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full select-none" 
+            style={{ 
+              userSelect: 'none', 
+              WebkitUserSelect: 'none'
             }}
-            onClick={handleDatePickerBackdropClick}
-            onTouchStart={(e) => {
-              // Prevent touch conflicts on Android
-              e.stopPropagation();
-            }}
-            onTouchEnd={(e) => {
-              // Handle touch end properly on Android
-              e.preventDefault();
+            onClick={(e) => {
+              console.log('📱 Modal content clicked - preventing close');
+              // Prevent modal from closing when clicking inside
               e.stopPropagation();
             }}
           >
-            <div 
-              style={{
-                backgroundColor: 'white',
-                borderRadius: '16px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                maxWidth: window.innerWidth > window.innerHeight ? '90vw' : '400px', // Use more width in landscape
-                width: '100%',
-                maxHeight: window.innerWidth > window.innerHeight ? '95vh' : '90vh', // Use more height in landscape
-                display: 'flex',
-                flexDirection: 'column',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                // Critical: Prevent Android touch issues
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                margin: window.innerWidth > window.innerHeight ? '4px 0' : '16px 0' // Less margin in landscape
-              }}
-              onClick={(e) => {
-                // Prevent modal from closing when clicking inside
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-              onTouchStart={(e) => {
-                // Prevent touch propagation to backdrop
-                e.stopPropagation();
-              }}
-              onTouchEnd={(e) => {
-                // Prevent touch propagation to backdrop
-                e.stopPropagation();
-              }}
-            >
-              {/* Header with close button */}
-              <div style={{ 
-                position: 'relative', 
-                padding: window.innerWidth > window.innerHeight ? '12px' : '24px', // Less padding in landscape
-                paddingBottom: window.innerWidth > window.innerHeight ? '8px' : '16px', 
-                borderBottom: '1px solid #e5e7eb', 
-                flexShrink: 0 
-              }}>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDatePicker(false);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDatePicker(false);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: '16px',
-                    right: '16px',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: '#6b7280',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <X style={{ width: '20px', height: '20px' }} />
-                </button>
-                
-                {/* External calendar export button removed */}
-                
-                <div style={{ textAlign: 'center' }}>
-                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '4px', margin: 0 }}>
-                    Select Month & Year
-                  </h3>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div style={{
-                padding: window.innerWidth > window.innerHeight ? '12px' : '24px', // Less padding in landscape
-                flex: 1,
-                overflowY: 'auto',
-                WebkitOverflowScrolling: 'touch',
-                touchAction: 'pan-y'
-              }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px', textAlign: 'center' }}>Year</label>
-                    <select
-                      value={currentYear}
-                      onChange={(e) => handleDatePickerChange(Number(e.target.value), currentMonth)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        textAlign: 'center',
-                        fontSize: '14px',
-                        touchAction: 'manipulation'
-                      }}
-                    >
-                      {Array.from({ length: 10 }, (_, i) => currentYear - 5 + i).map(year => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px', textAlign: 'center' }}>Month</label>
-                    <select
-                      value={currentMonth}
-                      onChange={(e) => handleDatePickerChange(currentYear, Number(e.target.value))}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        textAlign: 'center',
-                        fontSize: '14px',
-                        touchAction: 'manipulation'
-                      }}
-                    >
-                      {monthNames.map((month, index) => (
-                        <option key={index} value={index}>{month}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px', textAlign: 'center' }}>
-                    Salary for {monthNames[currentMonth]} {currentYear}
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={tempMonthlySalary}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d]/g, '');
-                        setTempMonthlySalary(value);
-                      }}
-                      onBlur={() => {
-                        if (onMonthlySalaryChange && tempMonthlySalary) {
-                          const salary = parseInt(tempMonthlySalary, 10) || 0;
-                          onMonthlySalaryChange(currentYear, currentMonth, salary);
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px',
-                        paddingRight: shouldUseGlobalSalary ? '40px' : '16px',
-                        border: shouldUseGlobalSalary ? '2px solid #10b981' : '2px solid #d1d5db',
-                        borderRadius: '8px',
-                        textAlign: 'center',
-                        fontSize: '16px',
-                        fontFamily: 'monospace',
-                        touchAction: 'manipulation',
-                        backgroundColor: shouldUseGlobalSalary ? '#f0fdf4' : 'white',
-                        color: shouldUseGlobalSalary ? '#059669' : '#111827'
-                      }}
-                    />
-                    {shouldUseGlobalSalary && (
-                      <div style={{
-                        position: 'absolute',
-                        right: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#10b981',
-                        fontSize: '18px'
-                      }}>
-                        🔒
-                      </div>
-                    )}
-                  </div>
-                  <p style={{
-                    fontSize: '12px',
-                    color: shouldUseGlobalSalary ? '#059669' : (monthlySalary === 0 ? '#6b7280' : '#6b7280'),
-                    marginTop: '8px',
-                    textAlign: 'center',
-                    fontWeight: shouldUseGlobalSalary ? '600' : '400'
-                  }}>
-                    {shouldUseGlobalSalary
-                      ? '🔒 Using global salary from Settings. Edit to set custom salary for this month.'
-                      : (monthlySalary === 0
-                          ? 'No salary set for this month. Enter a value to set custom salary.'
-                          : 'Custom salary for this month. Won\'t change when you update global salary.')}
-                  </p>
-                </div>
-              </div>
+            {/* Header with close button */}
+            <div className="relative p-6 pb-4 border-b border-gray-200">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('📱 Close button clicked');
+                  setShowDatePicker(false);
+                }}
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200 select-none"
+                style={{ 
+                  userSelect: 'none', 
+                  WebkitUserSelect: 'none',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <X className="w-5 h-5" />
+              </button>
               
-              {/* Footer with close button */}
-              <div style={{ 
-                padding: window.innerWidth > window.innerHeight ? '12px' : '24px', // Less padding in landscape
-                paddingTop: 0, 
-                flexShrink: 0 
-              }}>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDatePicker(false);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDatePicker(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#4f46e5',
-                    color: 'white',
-                    fontWeight: '600',
-                    borderRadius: '8px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  Close
-                </button>
+              {/* Title - centered */}
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-gray-900 mb-1 select-none">
+                  Select Month & Year
+                </h3>
               </div>
             </div>
-          </div>,
-          document.body
-        )
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-center select-none">Year</label>
+                  <select
+                    value={currentYear}
+                    onChange={(e) => handleDatePickerChange(Number(e.target.value), currentMonth)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center transition-colors duration-200"
+                  >
+                    {Array.from({ length: 10 }, (_, i) => currentYear - 5 + i).map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-center select-none">Month</label>
+                  <select
+                    value={currentMonth}
+                    onChange={(e) => handleDatePickerChange(currentYear, Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center transition-colors duration-200"
+                  >
+                    {monthNames.map((month, index) => (
+                      <option key={index} value={index}>{month}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('📱 Close modal button clicked');
+                  setShowDatePicker(false);
+                }}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors duration-200 active:scale-95 select-none"
+                style={{ 
+                  userSelect: 'none', 
+                  WebkitUserSelect: 'none',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
+              >
+                <span className="select-none">Close</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Calendar Body */}
@@ -1086,9 +841,11 @@ export const Calendar: React.FC<CalendarProps> = ({
 
         {/* Calendar grid - MOBILE OPTIMIZED ANIMATIONS */}
         <div 
+          ref={calendarGridRef} 
           className="mb-4 sm:mb-6 select-none w-full mx-auto"
-          ref={calendarGridRef}
           style={{
+            transform: 'translate3d(0,0,0)', // Force hardware acceleration
+            backfaceVisibility: 'hidden',     // Prevent flickering
             userSelect: 'none',
             WebkitUserSelect: 'none',
             display: 'grid',
@@ -1120,23 +877,27 @@ export const Calendar: React.FC<CalendarProps> = ({
                     : 'border-transparent'
                 }`}
                 style={{
+                  height: rowHeights[rowIndex], // All cells in same row have same height
+                  transform: 'translate3d(0,0,0)',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  WebkitTransform: 'translate3d(0,0,0)',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   display: 'flex',
-                  flexDirection: 'column',
-                  minHeight: `${cellSize}px` // Square size (width = height) but can grow with content
+                  flexDirection: 'column'
                 }}
                 onClick={() => day && handleDateClick(day)}
-               onMouseDown={(e) => day && handleDateLongPressStart(day, e)}
-               onMouseUp={handleDateLongPressEnd}
-               onMouseLeave={handleDateLongPressEnd}
-               onTouchStart={(e) => day && handleDateLongPressStart(day, e)}
-               onTouchEnd={handleDateLongPressEnd}
+                onMouseDown={(e) => day && handleDateLongPressStart(day, e)}
+                onMouseUp={handleDateLongPressEnd}
+                onMouseLeave={handleDateLongPressEnd}
+                onTouchStart={(e) => day && handleDateLongPressStart(day, e)}
+                onTouchEnd={handleDateLongPressEnd}
               >
                 {day && (
                   <div className="flex flex-col select-none h-full">
                     {/* BIG X WATERMARK for past dates */}
-                    {isPastDate(day) && (
+                    {pastDate && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                         <div className="text-gray-300 text-4xl sm:text-5xl font-bold opacity-30 select-none">
                           ✕
@@ -1144,10 +905,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                       </div>
                     )}
                     
-   
-                    
-                    {/* Date header with special indicator */}
-                    <div className={`flex-shrink-0 mb-1 sm:mb-1.5 relative ${isPastDate(day) ? 'z-30' : ''}`}>
+                    {/* Date header with special indicator and TODAY CIRCLE */}
+                    <div className={`flex-shrink-0 mb-1.5 sm:mb-2 relative ${pastDate ? 'z-30' : ''}`}>
                       <div className={`text-sm sm:text-base text-center font-semibold ${getDateTextColor(day)} relative select-none`}>
                         {/* TODAY CIRCLE - PERFECT SIZE FOR 2-DIGIT DATES */}
                         {todayDate && (
@@ -1182,41 +941,43 @@ export const Calendar: React.FC<CalendarProps> = ({
                       </div>
                     </div>
                     
-                    {/* Content container - grows naturally with content */}
-                    <div className={`flex flex-col items-center justify-start space-y-0 sm:space-y-0.5 px-0.5 select-none min-w-0 ${isPastDate(day) ? 'z-30' : ''}`}>
+                    {/* Content container - grows to fill available space */}
+                    <div className={`flex flex-col items-center justify-start space-y-0.5 sm:space-y-1 px-0.5 select-none min-w-0 flex-1 ${pastDate ? 'z-30' : ''}`}>
                       {/* Special date indicator */}
                       {hasSpecialDate && (
                         <div 
                           className="special-text text-[8px] sm:text-[9px] text-red-500 font-bold leading-none mt-0.5 flex justify-center select-none"
+                          style={{
+                            transform: 'translate3d(0,0,0)',
+                            backfaceVisibility: 'hidden',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none'
+                          }}
                         >
                           <div className="text-center select-none">SPECIAL</div>
                         </div>
                       )}
                       
-                      {/* All shifts displayed */}
+                      {/* All shifts displayed with labels */}
                       {dayShifts.map((shiftId, idx) => {
                         const shift = getShiftDisplay(shiftId);
                         return shift ? (
                           <div
                             key={`${shiftId}-${idx}`}
-                            className={`shift-text text-[8px] sm:text-[11px] font-bold leading-tight text-black flex-shrink-0 w-full select-none whitespace-nowrap overflow-hidden ${isPastDate(day) ? 'opacity-60' : ''}`}
+                            className={`shift-text text-[8px] sm:text-[11px] font-bold leading-tight text-black flex-shrink-0 w-full select-none whitespace-nowrap overflow-hidden ${pastDate ? 'opacity-50' : ''}`}
+                            style={{
+                              transform: 'translate3d(0,0,0)',
+                              backfaceVisibility: 'hidden',
+                              WebkitBackfaceVisibility: 'hidden',
+                              WebkitTransform: 'translate3d(0,0,0)',
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none'
+                            }}
                           >
-                            <div className="text-center select-none truncate px-0.5">{shift.time}</div>
+                            <div className="text-center select-none truncate px-0.5">{shift.label}</div>
                           </div>
                         ) : null;
                       })}
-                      
-                      {/* Note display */}
-                      {getDateNote(day) && (
-                        <div className="note-text text-[8px] sm:text-[10px] font-medium leading-tight text-indigo-600 flex-shrink-0 w-full select-none mt-0.5">
-                          <ScrollingText 
-                            text={getDateNote(day)} 
-                            pauseDuration={2}
-                            scrollDuration={3}
-                            className="text-center select-none"
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1292,7 +1053,6 @@ export const Calendar: React.FC<CalendarProps> = ({
         selectedDate={dateToDelete}
         schedule={schedule}
         specialDates={specialDates}
-        dateNotes={dateNotes}
         onConfirm={handleClearDate}
         onCancel={() => {
           setShowClearDateModal(false);
@@ -1301,12 +1061,12 @@ export const Calendar: React.FC<CalendarProps> = ({
       />
 
       {/* Clear Month Modal */}
-      <ClearMonthModal
+      <DeleteMonthModal
         isOpen={showClearMonthModal}
-        selectedMonth={currentMonth}
-        selectedYear={currentYear}
-        onConfirm={handleClearMonth}
-        onCancel={() => setShowClearMonthModal(false)}
+        month={currentMonth}
+        year={currentYear}
+        onConfirm={() => handleClearMonth(currentYear, currentMonth)}
+        onClose={() => setShowClearMonthModal(false)}
       />
 
       {/* Month Clear Modal (Long-press triggered) */}
@@ -1316,329 +1076,6 @@ export const Calendar: React.FC<CalendarProps> = ({
         onConfirm={handleClearMonth}
         onCancel={() => setShowMonthClearModal(false)}
       />
-
-  {/* Calendar export modal removed */}
-
-      {/* Import from Roster Modal */}
-      {showImportModal && createPortal(
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 99999,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: window.innerWidth > window.innerHeight ? 'flex-start' : 'center',
-            justifyContent: 'center',
-            padding: window.innerWidth > window.innerHeight ? '8px' : '16px',
-            paddingTop: window.innerWidth > window.innerHeight ? '4px' : '16px',
-            overflow: 'auto',
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y'
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleCloseImportModal();
-            }
-          }}
-        >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              maxWidth: window.innerWidth > window.innerHeight ? '90vw' : '400px',
-              width: '100%',
-              maxHeight: window.innerWidth > window.innerHeight ? '95vh' : '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              margin: window.innerWidth > window.innerHeight ? '4px 0' : '16px 0'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div style={{ 
-              position: 'relative', 
-              padding: window.innerWidth > window.innerHeight ? '12px' : '24px',
-              paddingBottom: window.innerWidth > window.innerHeight ? '8px' : '16px',
-              borderBottom: '1px solid #e5e7eb',
-              flexShrink: 0
-            }}>
-              <button
-                onClick={handleCloseImportModal}
-                disabled={isImporting}
-                style={{
-                  position: 'absolute',
-                  top: '16px',
-                  right: '16px',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  color: '#6b7280',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                <X style={{ width: '20px', height: '20px' }} />
-              </button>
-              
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  backgroundColor: '#dbeafe', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  margin: '0 auto 16px auto'
-                }}>
-                  <Download style={{ width: '24px', height: '24px', color: '#2563eb' }} />
-                </div>
-                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '8px', margin: 0 }}>
-                  Import Your Roster (Disabled)
-                </h3>
-                <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                  Roster import functionality has been removed
-                </p>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div style={{ 
-              padding: window.innerWidth > window.innerHeight ? '12px' : '24px',
-              flex: 1,
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-y'
-            }}>
-              {!importResults ? (
-                <>
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                      Your Authentication Code
-                    </label>
-                    <input
-                      type="text"
-                      value={importAuthCode}
-                      onChange={(e) => setImportAuthCode(e.target.value.toUpperCase())}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px',
-                        border: '2px solid #d1d5db',
-                        borderRadius: '8px',
-                        textAlign: 'center',
-                        fontFamily: 'monospace',
-                        fontSize: '18px',
-                        letterSpacing: '0.1em',
-                        textTransform: 'uppercase',
-                        touchAction: 'manipulation'
-                      }}
-                      placeholder="Enter your code"
-                      maxLength={4}
-                      autoComplete="off"
-                      autoFocus
-                    />
-                  </div>
-                  
-                  {importAuthError && (
-                    <div style={{ 
-                      marginBottom: '16px', 
-                      padding: '12px', 
-                      backgroundColor: '#fef2f2', 
-                      border: '1px solid #fecaca', 
-                      borderRadius: '8px' 
-                    }}>
-                      <p style={{ fontSize: '14px', color: '#dc2626', textAlign: 'center', margin: 0 }}>
-                        {importAuthError}
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#f0f9ff', 
-                    border: '1px solid #bae6fd', 
-                    borderRadius: '8px',
-                    marginBottom: '24px'
-                  }}>
-                    <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#0369a1', marginBottom: '8px', margin: '0 0 8px 0' }}>
-                      How it works:
-                    </h4>
-                    <ul style={{ fontSize: '12px', color: '#0c4a6e', margin: 0, paddingLeft: '16px' }}>
-                      <li>Enter your authentication code</li>
-                      <li>System finds all your roster assignments</li>
-                      <li>Adds them to your personal calendar</li>
-                      <li>Skips dates that already have shifts</li>
-                      <li>Marks special dates automatically</li>
-                    </ul>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ 
-                    width: '48px', 
-                    height: '48px', 
-                    backgroundColor: '#dcfce7', 
-                    borderRadius: '50%', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    margin: '0 auto 16px auto'
-                  }}>
-                    <svg style={{ width: '24px', height: '24px', color: '#16a34a' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  
-                  <h4 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '16px', margin: '0 0 16px 0' }}>
-                    Import Complete!
-                  </h4>
-                  
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(3, 1fr)', 
-                    gap: '16px', 
-                    marginBottom: '24px' 
-                  }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>
-                        {importResults.added}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>Added</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>
-                        {importResults.skipped}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>Skipped</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
-                        {importResults.errors}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>Errors</div>
-                    </div>
-                  </div>
-                  
-                  {importResults.added > 0 && (
-                    <p style={{ fontSize: '14px', color: '#16a34a', marginBottom: '16px', margin: '0 0 16px 0' }}>
-                      ✅ {importResults.added} shifts added to your calendar!
-                    </p>
-                  )}
-                  
-                  {importResults.skipped > 0 && (
-                    <p style={{ fontSize: '12px', color: '#f59e0b', marginBottom: '16px', margin: '0 0 16px 0' }}>
-                      ⏭️ {importResults.skipped} shifts skipped (conflicts or already exist)
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {/* Footer */}
-            <div style={{ 
-              padding: window.innerWidth > window.innerHeight ? '12px' : '24px',
-              paddingTop: 0,
-              flexShrink: 0
-            }}>
-              {!importResults ? (
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button
-                    onClick={handleCloseImportModal}
-                    disabled={isImporting}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      backgroundColor: '#f3f4f6',
-                      color: '#374151',
-                      fontWeight: '600',
-                      borderRadius: '8px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      opacity: isImporting ? 0.5 : 1
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleImportFromRoster}
-                    disabled={isImporting || importAuthCode.length < 4}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      backgroundColor: isImporting || importAuthCode.length < 4 ? '#d1d5db' : '#2563eb',
-                      color: 'white',
-                      fontWeight: '600',
-                      borderRadius: '8px',
-                      border: 'none',
-                      cursor: isImporting || importAuthCode.length < 4 ? 'not-allowed' : 'pointer',
-                      fontSize: '16px',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    {isImporting ? (
-                      <>
-                        <div style={{
-                          width: '16px',
-                          height: '16px',
-                          border: '2px solid white',
-                          borderTop: '2px solid transparent',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} />
-                        <span>Importing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download style={{ width: '16px', height: '16px' }} />
-                        <span>Import</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={handleCloseImportModal}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#2563eb',
-                    color: 'white',
-                    fontWeight: '600',
-                    borderRadius: '8px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  Close
-                </button>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Custom CSS for today's circle animation */}
       <style jsx>{`
@@ -1652,11 +1089,7 @@ export const Calendar: React.FC<CalendarProps> = ({
             opacity: 0.8;
           }
         }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
       `}</style>
     </div>
   );
-}; 
+};
