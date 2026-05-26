@@ -6,7 +6,7 @@ interface ClearMonthModalProps {
   isOpen: boolean;
   selectedMonth: number;
   selectedYear: number;
-  onConfirm: (year: number, month: number) => void | Promise<void>;
+  onConfirm: (year: number, month: number) => void;
   onCancel: () => void;
 }
 
@@ -26,27 +26,21 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const handleConfirm = async () => {
-    if (isClearing) return;
-    try {
-      setIsClearing(true);
-      await onConfirm(selectedYear, selectedMonth);
-      onCancel();
-    } catch (error) {
-      console.error('❌ Error during clear month:', error);
-    } finally {
-      setIsClearing(false);
-    }
+  const handleConfirm = () => {
+    setIsClearing(true);
+    onConfirm(selectedYear, selectedMonth);
+    setIsClearing(false);
+    onCancel();
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isClearing) {
+    if (e.target === e.currentTarget) {
       onCancel();
     }
   };
 
   return createPortal(
-    <div
+    <div 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
       onClick={handleBackdropClick}
       style={{
@@ -60,9 +54,9 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
         touchAction: 'pan-y'
       }}
     >
-      <div
+      <div 
         className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
-        style={{
+        style={{ 
           userSelect: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
@@ -81,7 +75,7 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
-
+          
           <div className="flex items-center justify-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
               <Calendar className="w-6 h-6 text-orange-600" />
@@ -91,7 +85,7 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
           <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
             Clear Month
           </h3>
-
+          
           <p className="text-sm text-gray-600 text-center">
             {monthNames[selectedMonth]} {selectedYear}
           </p>
@@ -113,7 +107,7 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
                 </div>
               </div>
             </div>
-
+            
             <p className="text-sm text-gray-700">
               Are you sure you want to clear all data for {monthNames[selectedMonth]} {selectedYear}?
             </p>
