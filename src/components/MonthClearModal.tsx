@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, Calendar } from 'lucide-react';
+import { X, Trash2, Calendar, AlertTriangle, Clock } from 'lucide-react';
 
 interface MonthData {
   month: number;
@@ -11,8 +11,8 @@ interface MonthData {
 
 interface MonthClearModalProps {
   isOpen: boolean;
-  monthData: MonthData;
-  onConfirm: (year: number, month: number) => void | Promise<void>;
+  monthData: MonthData | null;
+  onConfirm: (year: number, month: number) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -20,42 +20,94 @@ export const MonthClearModal: React.FC<MonthClearModalProps> = ({
   isOpen,
   monthData,
   onConfirm,
-  onCancel,
+  onCancel
 }) => {
-  const [isClearing, setIsClearing] = useState(false);
-
-  if (!isOpen || !monthData) return null;
-
-  const { month, year, totalShifts } = monthData;
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmationText, setConfirmationText] = useState('');
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = '0';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.bottom = '0';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.bottom = '';
+    };
+  }, [isOpen]);
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isLoading) {
+        onCancel();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen, isLoading, onCancel]);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoading(false);
+      setError(null);
+      setConfirmationText('');
+    }
+  }, [isOpen]);
+
+  // Early return if modal should not be shown
+  if (!isOpen || !monthData) return null;
+
+  const monthYearDisplay = `${monthNames[monthData.month]} ${monthData.year}`;
+  const expectedConfirmation = monthYearDisplay.toUpperCase();
+  const isConfirmationValid = confirmationText.toUpperCase() === expectedConfirmation;
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !isLoading) {
+      onCancel();
+    }
+  };
+
   const handleConfirm = async () => {
-    if (isClearing) return;
+    if (!isConfirmationValid || isLoading) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsClearing(true);
-      await onConfirm(year, month);
-      onCancel();
-    } catch (error) {
-      console.error('❌ Error during clear month:', error);
-    } finally {
-      setIsClearing(false);
+      await onConfirm(monthData.year, monthData.month);
+      onCancel(); // Close modal on success
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clear month data');
+      setIsLoading(false);
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isClearing) {
-      onCancel();
-    }
-  };
-
-  return createPortal(
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-      onClick={handleBackdropClick}
+  // Modal content JSX
+  const modalContent = (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[99999]"
+      onClick={handleOverlayClick}
       style={{
         position: 'fixed',
         top: 0,
@@ -63,102 +115,179 @@ export const MonthClearModal: React.FC<MonthClearModalProps> = ({
         right: 0,
         bottom: 0,
         zIndex: 99999,
+        // CRITICAL: Enable touch scrolling on the backdrop
         WebkitOverflowScrolling: 'touch',
-        touchAction: 'pan-y'
+        touchAction: 'pan-y', // Allow vertical panning (scrolling)
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        padding: window.innerWidth > window.innerHeight ? '4px' : '16px',
+        paddingTop: window.innerWidth > window.innerHeight ? '2px' : '16px'
       }}
     >
-      <div
-        className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
-        style={{
-          userSelect: 'none',
+      <div 
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full my-4 select-none"
+        style={{ 
+          userSelect: 'none', 
           WebkitUserSelect: 'none',
-          WebkitTouchCallout: 'none',
-          maxHeight: '90vh',
+          maxHeight: window.innerWidth > window.innerHeight ? '98vh' : '90vh',
+          maxWidth: window.innerWidth > window.innerHeight ? '95vw' : '28rem',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          margin: window.innerWidth > window.innerHeight ? '2px 0' : '16px 0'
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          // Prevent modal from closing when clicking inside
+          e.stopPropagation();
+        }}
       >
-        {/* Header */}
-        <div className="relative p-6 pb-4 border-b border-gray-200 flex-shrink-0">
-          <button
-            onClick={onCancel}
-            disabled={isClearing}
-            className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200 disabled:opacity-50"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
+        {/* Header - Fixed */}
+        <div className="relative pb-4 border-b border-gray-200 flex-shrink-0" style={{
+          padding: window.innerWidth > window.innerHeight ? '8px' : '24px'
+        }}>
+          {!isLoading && (
+            <button
+              onClick={onCancel}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200 select-none"
+              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+          
           <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-yellow-600" />
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+              <Trash2 className="w-6 h-6 text-red-600" />
             </div>
           </div>
 
           <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
-            Clear All Month Data
+            Clear Entire Month
           </h3>
-
-          <p className="text-sm text-gray-600 text-center">
-            {monthNames[month]} {year}
-          </p>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium text-yellow-800 mb-2">Caution:</h4>
-                  <ul className="text-sm text-yellow-700 space-y-1">
-                    <li>• This will clear all schedule data for this month ({totalShifts} shifts)</li>
-                    <li>• All shift assignments will be removed</li>
-                    <li>• Special dates and notes will be cleared</li>
-                    <li>• This action cannot be undone</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-sm text-gray-700">
-              Are you sure you want to proceed?
-            </p>
+          
+          <div className="flex items-center justify-center space-x-2 text-gray-600">
+            <Calendar className="w-4 h-4" />
+            <span className="text-sm">{monthYearDisplay}</span>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-6 flex-shrink-0">
+        {/* Scrollable content - Flexible */}
+        <div 
+          className="overflow-y-auto flex-1"
+          style={{
+            // CRITICAL: Enable smooth touch scrolling
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y', // Allow vertical panning (scrolling)
+            overscrollBehavior: 'contain',
+            padding: window.innerWidth > window.innerHeight ? '8px' : '24px'
+          }}
+        >
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <span className="text-sm text-red-700">{error}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Month Statistics */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h4 className="font-semibold text-gray-800 mb-3 text-center">Month Summary</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="text-center">
+                <div className="text-gray-600">Total Shifts</div>
+                <div className="font-bold text-gray-900">{monthData.totalShifts}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-gray-600">Total Amount</div>
+                <div className="font-bold text-gray-900">Rs {monthData.totalAmount.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Warning */}
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-left">
+                <p className="text-sm text-red-800 font-medium mb-2">
+                  This action will permanently delete:
+                </p>
+                <ul className="text-sm text-red-700 space-y-1">
+                  <li>• All scheduled shifts for {monthYearDisplay}</li>
+                  <li>• All special date markings</li>
+                  <li>• All shift combinations and data</li>
+                  <li>• All calculated amounts and totals</li>
+                </ul>
+                <p className="text-sm text-red-800 font-medium mt-3">
+                  This action cannot be undone!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Confirmation Input */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Type <span className="font-bold text-red-600">{expectedConfirmation}</span> to confirm:
+            </label>
+            <input
+              type="text"
+              value={confirmationText}
+              onChange={(e) => setConfirmationText(e.target.value)}
+              disabled={isLoading}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              placeholder={expectedConfirmation}
+            />
+            {confirmationText && !isConfirmationValid && (
+              <p className="text-sm text-red-600 mt-1">
+                Please type the exact text: {expectedConfirmation}
+              </p>
+            )}
+          </div>
+
+          {/* Long-press info */}
+
+          {/* Add extra padding at bottom to ensure all content is accessible */}
+          <div className="h-20" />
+        </div>
+
+        {/* Action Buttons - Fixed at bottom */}
+        <div className="flex-shrink-0 pt-0" style={{
+          padding: window.innerWidth > window.innerHeight ? '8px' : '24px'
+        }}>
           <div className="flex space-x-3">
             <button
               onClick={onCancel}
-              disabled={isClearing}
-              className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50"
+              disabled={isLoading}
+              className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirm}
-              disabled={isClearing}
-              className="flex-1 px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 flex items-center justify-center space-x-2"
+              disabled={isLoading || !isConfirmationValid}
+              className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
-              {isClearing ? (
+              {isLoading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Clearing...</span>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Clear All</span>
+                  <Trash2 className="w-4 h-4" />
+                  <span>Clear Month</span>
                 </>
               )}
             </button>
           </div>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
+
+  // Use createPortal to render modal at document root level
+  return createPortal(modalContent, document.body);
 };
