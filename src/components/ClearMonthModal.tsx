@@ -4,18 +4,18 @@ import { X, AlertTriangle, Calendar } from 'lucide-react';
 
 interface ClearMonthModalProps {
   isOpen: boolean;
-  month: number;
-  year: number;
-  onConfirm: () => void;
-  onClose: () => void;
+  selectedMonth: number;
+  selectedYear: number;
+  onConfirm: (year: number, month: number) => void | Promise<void>;
+  onCancel: () => void;
 }
 
 export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
   isOpen,
-  month,
-  year,
+  selectedMonth,
+  selectedYear,
   onConfirm,
-  onClose,
+  onCancel,
 }) => {
   const [isClearing, setIsClearing] = useState(false);
 
@@ -26,21 +26,27 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const handleConfirm = () => {
-    setIsClearing(true);
-    onConfirm();
-    setIsClearing(false);
-    onClose();
+  const handleConfirm = async () => {
+    if (isClearing) return;
+    try {
+      setIsClearing(true);
+      await onConfirm(selectedYear, selectedMonth);
+      onCancel();
+    } catch (error) {
+      console.error('❌ Error during clear month:', error);
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
+    if (e.target === e.currentTarget && !isClearing) {
+      onCancel();
     }
   };
 
   return createPortal(
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
       onClick={handleBackdropClick}
       style={{
@@ -54,9 +60,9 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
         touchAction: 'pan-y'
       }}
     >
-      <div 
+      <div
         className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
-        style={{ 
+        style={{
           userSelect: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',
@@ -69,13 +75,13 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
         {/* Header */}
         <div className="relative p-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <button
-            onClick={onClose}
+            onClick={onCancel}
             disabled={isClearing}
             className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200 disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
-          
+
           <div className="flex items-center justify-center space-x-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
               <Calendar className="w-6 h-6 text-orange-600" />
@@ -85,9 +91,9 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
           <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
             Clear Month
           </h3>
-          
+
           <p className="text-sm text-gray-600 text-center">
-            {monthNames[month]} {year}
+            {monthNames[selectedMonth]} {selectedYear}
           </p>
         </div>
 
@@ -107,9 +113,9 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
                 </div>
               </div>
             </div>
-            
+
             <p className="text-sm text-gray-700">
-              Are you sure you want to clear all data for {monthNames[month]} {year}?
+              Are you sure you want to clear all data for {monthNames[selectedMonth]} {selectedYear}?
             </p>
           </div>
         </div>
@@ -118,7 +124,7 @@ export const ClearMonthModal: React.FC<ClearMonthModalProps> = ({
         <div className="border-t border-gray-200 p-6 flex-shrink-0">
           <div className="flex space-x-3">
             <button
-              onClick={onClose}
+              onClick={onCancel}
               disabled={isClearing}
               className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50"
             >
