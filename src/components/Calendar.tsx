@@ -168,7 +168,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       }
     });
 
-    dayBoxes.forEach((box, index) => {
+    dayBoxes.forEach((box) => {
       const dayNumber = parseInt(box.getAttribute('data-day') || '0');
       const shiftElements = box.querySelectorAll('.shift-text');
       const specialElements = box.querySelectorAll('.special-text');
@@ -1152,18 +1152,16 @@ export const Calendar: React.FC<CalendarProps> = ({
       {/* Clear Date Modal */}
       <ClearDateModal
         isOpen={showClearDateModal}
-        selectedDate={dateToDelete}
-        schedule={schedule}
-        specialDates={specialDates}
-        dateNotes={dateNotes}
-        onConfirm={async (dateKey: string) => {
+        date={dateToDelete}
+        onConfirm={async () => {
+          if (!dateToDelete) return;
           try {
-            await handleClearDate(dateKey);
+            await handleClearDate(dateToDelete);
           } catch (error) {
             console.error('❌ Error clearing date:', error);
           }
         }}
-        onCancel={() => {
+        onClose={() => {
           setShowClearDateModal(false);
           setDateToDelete(null);
         }}
@@ -1172,30 +1170,31 @@ export const Calendar: React.FC<CalendarProps> = ({
       {/* Clear Month Modal */}
       <ClearMonthModal
         isOpen={showClearMonthModal}
-        selectedMonth={currentMonth}
-        selectedYear={currentYear}
-        onConfirm={async (year: number, month: number) => {
+        month={currentMonth}
+        year={currentYear}
+        onConfirm={async () => {
           try {
-            await handleClearMonth(year, month);
+            await handleClearMonth(currentYear, currentMonth);
           } catch (error) {
             console.error('❌ Error clearing month:', error);
           }
         }}
-        onCancel={() => setShowClearMonthModal(false)}
+        onClose={() => setShowClearMonthModal(false)}
       />
 
       {/* Month Clear Modal (Long-press triggered) */}
       <MonthClearModal
         isOpen={showMonthClearModal}
-        monthData={getMonthStatistics()}
-        onConfirm={async (year: number, month: number) => {
+        month={currentMonth}
+        year={currentYear}
+        onConfirm={async () => {
           try {
-            await handleClearMonth(year, month);
+            await handleClearMonth(currentYear, currentMonth);
           } catch (error) {
             console.error('❌ Error clearing month:', error);
           }
         }}
-        onCancel={() => setShowMonthClearModal(false)}
+        onClose={() => setShowMonthClearModal(false)}
       />
 
       {/* Import from Roster Modal */}
