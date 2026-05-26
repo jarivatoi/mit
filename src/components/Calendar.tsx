@@ -395,8 +395,17 @@ export const Calendar: React.FC<CalendarProps> = ({
   const longPressHandlers = useLongPress({
     onLongPress: () => {
       setIsLongPressActive(true);
-      if (hasMonthData()) {
+      const dataPresent = hasMonthData();
+      console.log('🔥 Month long-press fired', {
+        currentMonth: currentMonth + 1,
+        currentYear,
+        scheduleEntries: Object.keys(schedule).length,
+        hasMonthData: dataPresent
+      });
+      if (dataPresent) {
         setShowMonthClearModal(true);
+      } else {
+        console.warn('⚠️ Month has no data — modal suppressed');
       }
       setTimeout(() => setIsLongPressActive(false), 500);
     },
