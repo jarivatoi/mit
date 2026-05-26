@@ -1497,7 +1497,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       <MonthClearModal
         isOpen={showMonthClearModal}
         monthData={getMonthStatistics()}
-        onConfirm={(year, month) => handleClearMonth(year, month)}
+        onConfirm={handleClearMonth}
         onCancel={() => setShowMonthClearModal(false)}
       />
 
