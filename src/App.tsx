@@ -343,8 +343,8 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
   const renderTabContent = () => {
     switch (activeTab) {
       case 'calendar':
-        // Use user's surname as schedule title if user is logged in
-        const currentScheduleTitle = user?.surname ? `${user.surname}'s Schedule` : scheduleTitle;
+        // Use user's surname as calendar title if user is logged in
+        const currentScheduleTitle = user?.surname ? user.surname : scheduleTitle;
         // Get monthly salary for current viewing month
         const currentMonth = currentDate.getMonth();
         const currentYear = currentDate.getFullYear();
