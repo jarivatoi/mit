@@ -1,27 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Calculator, Edit3, TrendingUp, Trash2, AlertTriangle, X } from 'lucide-react';
-import { Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Calculator, Edit3, TrendingUp, Trash2, AlertTriangle, X, Download } from 'lucide-react';
 import { gsap } from 'gsap';
 import { SHIFTS } from '../constants';
 import { DaySchedule, SpecialDates, DateNotes } from '../types';
 import { ClearDateModal } from './ClearDateModal';
 import { ClearMonthModal } from './ClearMonthModal';
 import { MonthClearModal } from './MonthClearModal';
-import { CalendarExportModal } from './CalendarExportModal';
 import { ScrollingText } from './ScrollingText';
+// Calendar export modal removed
 import { formatMauritianRupees } from '../utils/currency';
 import { useLongPress } from '../hooks/useLongPress';
-import { validatePasscode } from '../utils/passcodeAuth';
-import { fetchRosterEntries } from '../utils/rosterApi';
-import { syncRosterToCalendar } from '../utils/rosterCalendarSync';
+
 
 interface CalendarProps {
   currentDate: Date;
   schedule: DaySchedule;
   specialDates: SpecialDates;
-  dateNotes?: DateNotes;
-  specialDateTexts?: Record<string, string>; // Actual special date text from roster
+  dateNotes: DateNotes;
   onDateClick: (day: number) => void;
   onNavigateMonth: (direction: 'prev' | 'next') => void;
   totalAmount: number;
@@ -32,7 +28,7 @@ interface CalendarProps {
   onResetMonth?: (year: number, month: number) => void;
   setSchedule: React.Dispatch<React.SetStateAction<DaySchedule>>;
   setSpecialDates: React.Dispatch<React.SetStateAction<SpecialDates>>;
-  setDateNotes?: React.Dispatch<React.SetStateAction<DateNotes>>;
+  setDateNotes: React.Dispatch<React.SetStateAction<DateNotes>>;
   monthlySalary?: number;
   onMonthlySalaryChange?: (year: number, month: number, salary: number) => void;
   globalSalary?: number;
@@ -42,8 +38,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   currentDate,
   schedule,
   specialDates,
-  dateNotes = {},
-  specialDateTexts = {},
+  dateNotes,
   onDateClick,
   onNavigateMonth,
   totalAmount,
@@ -53,7 +48,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   onTitleUpdate,
   setSchedule,
   setSpecialDates,
-  setDateNotes = () => {},
+  setDateNotes,
   monthlySalary = 0,
   onMonthlySalaryChange,
   globalSalary = 0
@@ -64,7 +59,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [showClearDateModal, setShowClearDateModal] = useState(false);
   const [showClearMonthModal, setShowClearMonthModal] = useState(false);
   const [showMonthClearModal, setShowMonthClearModal] = useState(false);
-  const [showCalendarExportModal, setShowCalendarExportModal] = useState(false);
+  // Removed: external calendar export modal state
   const [dateToDelete, setDateToDelete] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLongPressActive, setIsLongPressActive] = useState(false);
@@ -104,6 +99,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     const interval = setInterval(() => {
       // This will trigger a re-render by updating a dummy state or through other means
       // In this case, we'll just log that a refresh check happened
+      console.log('🕒 Auto-refresh check for month-to-date value');
     }, 60000); // Refresh every minute
 
     return () => clearInterval(interval);
@@ -133,7 +129,6 @@ export const Calendar: React.FC<CalendarProps> = ({
   }, [showDatePicker, showImportModal]);
 
   // Enhanced TweenMax animations with smooth easing
-  // NOTE: Only run on mount and when currentDate changes (month navigation)
   useEffect(() => {
     if (calendarGridRef.current) {
       // Clear previous animated elements
@@ -148,11 +143,6 @@ export const Calendar: React.FC<CalendarProps> = ({
           return dayA - dayB;
         });
       
-      if (dayBoxes.length === 0) {
-          console.warn('⚠️ Calendar: No day boxes found, skipping animation');
-        return;
-      }
-      
       // Set initial state with hardware acceleration
       gsap.set(dayBoxes, {
         opacity: 0,
@@ -164,25 +154,21 @@ export const Calendar: React.FC<CalendarProps> = ({
 
       // Set initial state for shift texts (avoid interfering with ScrollingText)
       const shiftTexts = calendarGridRef.current.querySelectorAll('.shift-text');
-      if (shiftTexts.length > 0) {
-        gsap.set(shiftTexts, {
-          opacity: 0,
-          x: 10,  // Slide from right
-          scale: 0.9,
-          force3D: true
-        });
-      }
+      gsap.set(shiftTexts, {
+        opacity: 0,
+        x: 10,  // Slide from right
+        scale: 0.9,
+        force3D: true
+      });
 
       // Set initial state for special text (avoid interfering with ScrollingText)
       const specialTexts = calendarGridRef.current.querySelectorAll('.special-text');
-      if (specialTexts.length > 0) {
-        gsap.set(specialTexts, {
-          opacity: 0,
-          scale: 0.9,
-          x: 15,  // Slide from right
-          force3D: true
-        });
-      }
+      gsap.set(specialTexts, {
+        opacity: 0,
+        scale: 0.9,
+        x: 15,  // Slide from right
+        force3D: true
+      });
 
       // Create master timeline with smooth TweenMax-style easing
       const masterTl = gsap.timeline({
@@ -193,7 +179,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       });
 
       // Animate boxes with staggered entrance
-      dayBoxes.forEach((box) => {
+      dayBoxes.forEach((box, index) => {
         const dayNumber = parseInt(box.getAttribute('data-day') || '0');
         const shiftElements = box.querySelectorAll('.shift-text');
         const specialElements = box.querySelectorAll('.special-text');
@@ -241,13 +227,11 @@ export const Calendar: React.FC<CalendarProps> = ({
       });
       
       // Add hover animations for interactive elements
-      const hoverHandlers = new Map<HTMLElement, { enter: () => void, leave: () => void, click: () => void }>();
-      
       dayBoxes.forEach(box => {
         const dayElement = box as HTMLElement;
         
         // Hover enter animation
-        const handleMouseEnter = () => {
+        dayElement.addEventListener('mouseenter', () => {
           if (animatedElementsRef.current.has(dayElement)) {
             gsap.to(dayElement, {
               scale: 1.02,
@@ -255,10 +239,10 @@ export const Calendar: React.FC<CalendarProps> = ({
               ease: "power2.out"
             });
           }
-        };
+        });
         
         // Hover leave animation
-        const handleMouseLeave = () => {
+        dayElement.addEventListener('mouseleave', () => {
           if (animatedElementsRef.current.has(dayElement)) {
             gsap.to(dayElement, {
               scale: 1,
@@ -266,10 +250,10 @@ export const Calendar: React.FC<CalendarProps> = ({
               ease: "power2.out"
             });
           }
-        };
+        });
         
         // Click animation
-        const handleClick = () => {
+        dayElement.addEventListener('click', () => {
           if (animatedElementsRef.current.has(dayElement)) {
             gsap.to(dayElement, {
               scale: 0.98,
@@ -279,47 +263,10 @@ export const Calendar: React.FC<CalendarProps> = ({
               repeat: 1
             });
           }
-        };
-        
-        // Store handlers
-        hoverHandlers.set(dayElement, {
-          enter: handleMouseEnter,
-          leave: handleMouseLeave,
-          click: handleClick
         });
-        
-        // Add event listeners
-        dayElement.addEventListener('mouseenter', handleMouseEnter);
-        dayElement.addEventListener('mouseleave', handleMouseLeave);
-        dayElement.addEventListener('click', handleClick);
       });
-      
-      // Cleanup function
-      return () => {
-        // Kill the timeline
-        masterTl.kill();
-        
-        // Remove all event listeners
-        dayBoxes.forEach(box => {
-          const dayElement = box as HTMLElement;
-          const handlers = hoverHandlers.get(dayElement);
-          if (handlers) {
-            dayElement.removeEventListener('mouseenter', handlers.enter);
-            dayElement.removeEventListener('mouseleave', handlers.leave);
-            dayElement.removeEventListener('click', handlers.click);
-          }
-        });
-        
-        hoverHandlers.clear();
-        animatedElementsRef.current.clear();
-        
-        // Reset all animated elements to their final state
-        gsap.set(dayBoxes, {
-          clearProps: "all"
-        });
-      };
     }
-  }, [currentDate]); // ✅ ONLY depend on currentDate (month navigation), NOT schedule/specialDates
+  }, [currentDate, schedule, specialDates]);
 
   // Close modal on escape key - EXACTLY LIKE SHIFT MODAL
   useEffect(() => {
@@ -379,34 +326,22 @@ export const Calendar: React.FC<CalendarProps> = ({
     return specialDates[dateKey] === true;
   };
 
-  const getDateNote = (day: number) => {
-    const dateKey = formatDateKey(day);
-    return dateNotes[dateKey] || '';
-  };
-
   const getDayShifts = (day: number) => {
     const dateKey = formatDateKey(day);
     const shifts = schedule[dateKey] || [];
     
+    // Debug logging for specific dates that should have data
+    if (day === 1 || day === 2 || day === 21) {
+      console.log(`📅 CALENDAR DEBUG: Day ${day} (${dateKey}) has shifts:`, shifts);
+      console.log(`📅 CALENDAR DEBUG: Current month/year: ${currentMonth + 1}/${currentYear}`);
+      console.log(`📅 CALENDAR DEBUG: Schedule keys:`, Object.keys(schedule));
+    }
+    
     // Sort shifts in the desired display order: 9-4, 4-10, 12-10, N
     const shiftOrder = ['9-4', '4-10', '12-10', 'N'];
     return shifts.sort((a, b) => {
-      // Extract base shift code (e.g., '9-4' from '9-4-NARAYYA')
-      const getBaseShift = (shiftId: string) => {
-        const parts = shiftId.split('-');
-        if (parts.length >= 2 && !isNaN(Number(parts[parts.length - 1]))) {
-          // Format: 9-4-NARAYYA -> take first two parts: 9-4
-          return parts.slice(0, 2).join('-');
-        }
-        // Format: N-NARAYYA -> take first part: N
-        return parts[0];
-      };
-      
-      const baseA = getBaseShift(a);
-      const baseB = getBaseShift(b);
-      
-      const indexA = shiftOrder.indexOf(baseA);
-      const indexB = shiftOrder.indexOf(baseB);
+      const indexA = shiftOrder.indexOf(a);
+      const indexB = shiftOrder.indexOf(b);
       
       // If shift not found in order array, put it at the end
       const orderA = indexA === -1 ? 999 : indexA;
@@ -416,25 +351,13 @@ export const Calendar: React.FC<CalendarProps> = ({
     });
   };
 
+  const getDateNote = (day: number) => {
+    const dateKey = formatDateKey(day);
+    return dateNotes[dateKey] || '';
+  };
+
   const getShiftDisplay = (shiftId: string) => {
-    // Extract base shift code (e.g., '9-4' from '9-4-NARAYYA', or 'N' from 'N-NARAYYA')
-    const getBaseShift = (id: string) => {
-      const parts = id.split('-');
-      
-      // Handle formats like '9-4-NARAYYA' -> '9-4'
-      if (parts.length >= 2 && parts[0].match(/^\d+$/) && parts[1].match(/^\d+$/)) {
-        return `${parts[0]}-${parts[1]}`;
-      }
-      // Handle formats like 'N-NARAYYA' -> 'N'
-      if (parts.length > 1) {
-        return parts[0];
-      }
-      // Plain shift IDs like 'N', '9-4', '4-10', '12-10'
-      return id;
-    };
-    
-    const baseShiftCode = getBaseShift(shiftId);
-    return SHIFTS.find(shift => shift.id === baseShiftCode);
+    return SHIFTS.find(shift => shift.id === shiftId);
   };
 
   const getDateTextColor = (day: number) => {
@@ -491,7 +414,15 @@ export const Calendar: React.FC<CalendarProps> = ({
              isSpecial === true;
     });
     
-    return hasShifts || hasSpecialDates;
+    // Check for notes in current month
+    const hasNotes = Object.entries(dateNotes).some(([dateKey, note]) => {
+      const workDate = new Date(dateKey);
+      return workDate.getMonth() === currentMonth && 
+             workDate.getFullYear() === currentYear && 
+             note && note.trim() !== '';
+    });
+    
+    return hasShifts || hasSpecialDates || hasNotes;
   };
 
   // Long-press handlers for month header
@@ -595,176 +526,85 @@ export const Calendar: React.FC<CalendarProps> = ({
     }
   };
 
-  // Clear date function - PRESERVES ROSTER SPECIAL DATES
+  // Clear date function
   const handleClearDate = async (dateKey: string): Promise<void> => {
-    try {
-      console.log(`🗑️ Starting clear operation for ${dateKey}`);
-      
-      // Clear schedule data for this specific date
-      setSchedule(prev => {
-        const newSchedule = { ...prev };
-        delete newSchedule[dateKey];
-        return newSchedule;
-      });
-      
-      // Clear special date marking ONLY if NOT a roster special date
-      setSpecialDates(prev => {
-        const newSpecialDates = { ...prev };
-        // Only delete if there's no roster text for this date (preserve roster special dates)
-        if (!specialDateTexts[dateKey]) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Clear schedule data for this specific date
+        setSchedule(prev => {
+          const newSchedule = { ...prev };
+          delete newSchedule[dateKey];
+          return newSchedule;
+        });
+        
+        // Clear special date marking for this specific date
+        setSpecialDates(prev => {
+          const newSpecialDates = { ...prev };
           delete newSpecialDates[dateKey];
-        }
-        return newSpecialDates;
-      });
-      
-      // Clear note for this specific date - AUTOMATICALLY SAVED BY HOOK
-      setDateNotes(prev => {
-        const newDateNotes = { ...prev };
-        newDateNotes[dateKey] = '';
-        return newDateNotes;
-      });
-      
-      console.log(`✅ Successfully cleared date ${dateKey}`);
-    } catch (error) {
-      console.error(`❌ Error clearing date ${dateKey}:`, error);
-      throw error;
-    }
+          return newSpecialDates;
+        });
+        
+        // Clear note for this specific date
+        setDateNotes(prev => {
+          const newDateNotes = { ...prev };
+          delete newDateNotes[dateKey];
+          return newDateNotes;
+        });
+        
+        console.log(`✅ Successfully cleared date ${dateKey}`);
+        resolve();
+      } catch (error) {
+        console.error(`❌ Error clearing date ${dateKey}:`, error);
+        reject(error);
+      }
+    });
   };
 
-  // Clear month function - PRESERVES ROSTER SPECIAL DATES
+  // Clear month function
   const handleClearMonth = async (year: number, month: number): Promise<void> => {
-    try {
-      console.log(`🗑️ Starting clear operation for month ${month + 1}/${year}`);
-      
-      // Create date keys for the entire month
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const monthDateKeys: string[] = [];
-      
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-        monthDateKeys.push(dateKey);
-      }
-      
-      // Clear schedule data for the month
-      setSchedule(prev => {
-        const newSchedule = { ...prev };
-        monthDateKeys.forEach(dateKey => {
-          delete newSchedule[dateKey];
+    return new Promise((resolve, reject) => {
+      try {
+        // Create date keys for the entire month
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const monthDateKeys: string[] = [];
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+          const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          monthDateKeys.push(dateKey);
+        }
+        
+        // Clear schedule data for the month
+        setSchedule(prev => {
+          const newSchedule = { ...prev };
+          monthDateKeys.forEach(dateKey => {
+            delete newSchedule[dateKey];
+          });
+          return newSchedule;
         });
-        return newSchedule;
-      });
-      
-      // Clear special dates for the month - PRESERVE ROSTER SPECIAL DATES
-      setSpecialDates(prev => {
-        const newSpecialDates = { ...prev };
-        monthDateKeys.forEach(dateKey => {
-          // Only delete if there's no roster text for this date (preserve roster special dates)
-          if (!specialDateTexts[dateKey]) {
+        
+        // Clear special dates for the month
+        setSpecialDates(prev => {
+          const newSpecialDates = { ...prev };
+          monthDateKeys.forEach(dateKey => {
             delete newSpecialDates[dateKey];
-          }
+          });
+          return newSpecialDates;
         });
-        return newSpecialDates;
-      });
-      
-      // Clear notes for the entire month - AUTOMATICALLY SAVED BY HOOK
-      setDateNotes(prev => {
-        const newDateNotes = { ...prev };
-        monthDateKeys.forEach(dateKey => {
-          newDateNotes[dateKey] = '';
-        });
-        return newDateNotes;
-      });
-      
-      console.log(`✅ Successfully cleared month ${month + 1}/${year}`);
-    } catch (error) {
-      console.error(`❌ Error clearing month ${month + 1}/${year}:`, error);
-      throw error;
-    }
+        
+        console.log(`✅ Successfully cleared month ${month + 1}/${year}`);
+        resolve();
+      } catch (error) {
+        console.error(`❌ Error clearing month ${month + 1}/${year}:`, error);
+        reject(error);
+      }
+    });
   };
 
   // Handle roster import
   const handleImportFromRoster = async () => {
-    if (!importAuthCode || importAuthCode.length < 4) {
-      setImportAuthError('Please enter your authentication code');
-      return;
-    }
-
-    const result = await validatePasscode(importAuthCode);
-    if (!result || !result.isValid) {
-      setImportAuthError('Invalid passcode');
-      return;
-    }
-    const userName = `${result.surname}, ${result.name}`;
-
-    setIsImporting(true);
-    setImportAuthError('');
-    
-    try {
-      console.log(`📥 Importing roster entries for ${userName}...`);
-      
-      // Fetch all roster entries
-      const allRosterEntries = await fetchRosterEntries();
-      
-      // Filter entries for this user (match base name)
-      const userBaseName = userName.replace(/\(R\)$/, '').trim().toUpperCase();
-      const userEntries = allRosterEntries.filter(entry => {
-        const entryBaseName = entry.assigned_name.replace(/\(R\)$/, '').trim().toUpperCase();
-        return entryBaseName === userBaseName;
-      });
-      
-      console.log(`📊 Found ${userEntries.length} roster entries for ${userName}`);
-      
-      let addedCount = 0;
-      let skippedCount = 0;
-      let errorCount = 0;
-      
-      // Process each entry
-      for (const entry of userEntries) {
-        try {
-          // Create roster change event for sync
-          const rosterChange = {
-            date: entry.date,
-            shiftType: entry.shift_type,
-            assignedName: entry.assigned_name,
-            editorName: userName,
-            action: 'added' as const
-          };
-          
-          // Use the sync function to add to calendar
-          const syncResult = syncRosterToCalendar(rosterChange, {
-            calendarLabel: userName, // Use the authenticated user's name as calendar label
-            schedule,
-            specialDates,
-            setSchedule,
-            setSpecialDates
-          });
-          
-          if (syncResult) {
-            addedCount++;
-            console.log(`✅ Added ${entry.shift_type} on ${entry.date}`);
-          } else {
-            skippedCount++;
-            console.log(`⏭️ Skipped ${entry.shift_type} on ${entry.date} (conflict or already exists)`);
-          }
-        } catch (error) {
-          errorCount++;
-          console.error(`❌ Error processing entry for ${entry.date}:`, error);
-        }
-      }
-      
-      setImportResults({ added: addedCount, skipped: skippedCount, errors: errorCount });
-      
-      // Show success message
-      if (addedCount > 0) {
-        console.log(`✅ Import completed: ${addedCount} added, ${skippedCount} skipped, ${errorCount} errors`);
-      }
-      
-    } catch (error) {
-      console.error('❌ Import failed:', error);
-      setImportAuthError('Failed to import roster data. Please try again.');
-    } finally {
-      setIsImporting(false);
-    }
+    // Roster import functionality removed - roster tab no longer exists
+    setImportAuthError('Roster import has been disabled');
+    setIsImporting(false);
   };
 
   const handleCloseImportModal = () => {
@@ -774,24 +614,23 @@ export const Calendar: React.FC<CalendarProps> = ({
     setImportResults(null);
   };
 
-  // Debug function to log current calendar state - DISABLED to prevent console spam
-  // Only enable when actively debugging specific issues
-  // useEffect(() => {
-  //   console.log('📅 CALENDAR DEBUG: Current calendar state:', {
-  //     currentMonth: currentMonth + 1,
-  //     currentYear,
-  //     scheduleKeys: Object.keys(schedule),
-  //     scheduleEntries: Object.entries(schedule).slice(0, 5),
-  //     specialDatesKeys: Object.keys(specialDates),
-  //     totalScheduleEntries: Object.keys(schedule).length,
-  //     totalSpecialDates: Object.keys(specialDates).length,
-  //     sampleScheduleData: Object.entries(schedule).slice(0, 3).map(([date, shifts]) => ({
-  //       date,
-  //       shifts,
-  //       dayOfWeek: new Date(date).getDay()
-  //     }))
-  //   });
-  // }, [schedule, specialDates, currentMonth, currentYear]);
+  // Debug function to log current calendar state
+  useEffect(() => {
+    console.log('📅 CALENDAR DEBUG: Current calendar state:', {
+      currentMonth: currentMonth + 1,
+      currentYear,
+      scheduleKeys: Object.keys(schedule),
+      scheduleEntries: Object.entries(schedule).slice(0, 5),
+      specialDatesKeys: Object.keys(specialDates),
+      totalScheduleEntries: Object.keys(schedule).length,
+      totalSpecialDates: Object.keys(specialDates).length,
+      sampleScheduleData: Object.entries(schedule).slice(0, 3).map(([date, shifts]) => ({
+        date,
+        shifts,
+        dayOfWeek: new Date(date).getDay()
+      }))
+    });
+  }, [schedule, specialDates, currentMonth, currentYear]);
   
   const handleMonthNavigation = (direction: 'prev' | 'next') => {
     onNavigateMonth(direction);
@@ -826,6 +665,34 @@ export const Calendar: React.FC<CalendarProps> = ({
     return cellWidth < 50 ? 50 : cellWidth; // Only enforce minimum if extremely small
   };
 
+  const cellSize = getCellSize();
+
+  // Resize listener to recalculate cell dimensions on zoom/window resize
+  useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout | null = null;
+    
+    const handleResize = () => {
+      // Debounce resize events to avoid excessive recalculations
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      
+      resizeTimeout = setTimeout(() => {
+        // Force re-render by updating a dummy state
+        setShowDatePicker(prev => prev);
+      }, 150); // 150ms debounce
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+    };
+  }, []);
+
   return (
     <div className="bg-white overflow-hidden select-none" style={{
       userSelect: 'none', 
@@ -846,7 +713,7 @@ export const Calendar: React.FC<CalendarProps> = ({
               <input
                 type="text"
                 value={tempTitle}
-                onChange={(e) => setTempTitle(e.target.value.toUpperCase())}
+                onChange={(e) => setTempTitle(e.target.value)}
                 onKeyDown={handleTitleKeyPress}
                 onBlur={handleTitleSave}
                 className="text-xl sm:text-3xl font-bold text-gray-900 text-center bg-transparent border-b-2 border-indigo-500 focus:outline-none min-w-[250px] sm:min-w-[300px]"
@@ -1041,21 +908,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                   <X style={{ width: '20px', height: '20px' }} />
                 </button>
                 
-                {/* Export to Calendar Button */}
-                <button
-                  onClick={() => {
-                    setShowDatePicker(false); // Close month/year selector first
-                    setShowCalendarExportModal(true); // Then open export modal
-                  }}
-                  className="p-2 rounded-lg hover:bg-green-100 text-green-600 hover:text-green-700 transition-colors duration-200"
-                  title="Export shifts to external calendar"
-                  style={{
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <Download className="w-5 h-5" />
-                </button>
+                {/* External calendar export button removed */}
                 
                 <div style={{ textAlign: 'center' }}>
                   <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '4px', margin: 0 }}>
@@ -1270,7 +1123,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                   WebkitUserSelect: 'none',
                   display: 'flex',
                   flexDirection: 'column',
-                  minHeight: `${getCellSize()}px` // Square size (width = height) but can grow with content
+                  minHeight: `${cellSize}px` // Square size (width = height) but can grow with content
                 }}
                 onClick={() => day && handleDateClick(day)}
                onMouseDown={(e) => day && handleDateLongPressStart(day, e)}
@@ -1292,8 +1145,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                     
    
                     
-                    {/* Date header with special indicator and TODAY CIRCLE */}
-                    <div className={`flex-shrink-0 mb-1.5 sm:mb-2 relative ${isPastDate(day) ? 'z-30' : ''}`}>
+                    {/* Date header with special indicator */}
+                    <div className={`flex-shrink-0 mb-1 sm:mb-1.5 relative ${isPastDate(day) ? 'z-30' : ''}`}>
                       <div className={`text-sm sm:text-base text-center font-semibold ${getDateTextColor(day)} relative select-none`}>
                         {/* TODAY CIRCLE - PERFECT SIZE FOR 2-DIGIT DATES */}
                         {todayDate && (
@@ -1328,47 +1181,16 @@ export const Calendar: React.FC<CalendarProps> = ({
                       </div>
                     </div>
                     
-                    {/* Content container - only takes needed space */}
-                    <div className={`flex flex-col items-center justify-start space-y-0.5 sm:space-y-1 px-0.5 select-none min-w-0 ${isPastDate(day) ? 'z-30' : ''}`}>
-                      {/* Special date indicator with actual roster text */}
-                      {(() => {
-                        const dateKey = formatDateKey(day);
-                        const hasSpecialDateFlag = specialDates[dateKey] === true;
-                        const hasRosterSpecialText = specialDateTexts[dateKey];
-                        // Only treat as roster text if it exists AND is NOT the 'SPECIAL' placeholder
-                        const isActualRosterText = hasRosterSpecialText && hasRosterSpecialText !== 'SPECIAL';
-                        // Show if EITHER manually marked OR has roster text
-                        return (hasSpecialDateFlag || hasRosterSpecialText) ? (
-                          <div 
-                            className="special-text text-[8px] sm:text-[9px] text-red-500 font-bold leading-none mt-0.5 flex justify-center select-none transition-all duration-500 ease-in-out"
-                            style={{ 
-                              opacity: 1,
-                              // Only apply width constraints for roster-sourced text (to enable scrolling)
-                              // Manual special dates should NOT have width constraints
-                              ...(isActualRosterText ? {
-                                width: '100%',
-                                maxWidth: '100%',
-                                overflow: 'hidden'
-                              } : {})
-                            }}
-                          >
-                            {isActualRosterText ? (
-                              // Roster special text - enable scrolling
-                              <ScrollingText 
-                                text={hasRosterSpecialText} 
-                                pauseDuration={2}
-                                scrollDuration={4}
-                                className="text-center select-none animate-fadeIn"
-                              >
-                                <div className="text-center select-none transition-colors duration-300 whitespace-nowrap">{hasRosterSpecialText}</div>
-                              </ScrollingText>
-                            ) : (
-                              // Manual special date - NO scrolling, just plain text
-                              <div className="text-center select-none transition-colors duration-300 whitespace-nowrap">SPECIAL</div>
-                            )}
-                          </div>
-                        ) : null;
-                      })()}
+                    {/* Content container - grows naturally with content */}
+                    <div className={`flex flex-col items-center justify-start space-y-0 sm:space-y-0.5 px-0.5 select-none min-w-0 ${isPastDate(day) ? 'z-30' : ''}`}>
+                      {/* Special date indicator */}
+                      {hasSpecialDate && (
+                        <div 
+                          className="special-text text-[8px] sm:text-[9px] text-red-500 font-bold leading-none mt-0.5 flex justify-center select-none"
+                        >
+                          <div className="text-center select-none">SPECIAL</div>
+                        </div>
+                      )}
                       
                       {/* All shifts displayed */}
                       {dayShifts.map((shiftId, idx) => {
@@ -1378,20 +1200,13 @@ export const Calendar: React.FC<CalendarProps> = ({
                             key={`${shiftId}-${idx}`}
                             className={`shift-text text-[8px] sm:text-[11px] font-bold leading-tight text-black flex-shrink-0 w-full select-none whitespace-nowrap overflow-hidden ${isPastDate(day) ? 'opacity-60' : ''}`}
                           >
-                            <ScrollingText 
-                              text={shift.time} 
-                              pauseDuration={2}
-                              scrollDuration={4}
-                              className="text-center select-none truncate px-0.5"
-                            >
-                              <div className="text-center select-none truncate px-0.5">{shift.time}</div>
-                            </ScrollingText>
+                            <div className="text-center select-none truncate px-0.5">{shift.time}</div>
                           </div>
                         ) : null;
                       })}
                       
                       {/* Note display */}
-                      {getDateNote(day) && getDateNote(day).trim() !== '' && (
+                      {getDateNote(day) && (
                         <div className="note-text text-[8px] sm:text-[10px] font-medium leading-tight text-indigo-600 flex-shrink-0 w-full select-none mt-0.5">
                           <ScrollingText 
                             text={getDateNote(day)} 
@@ -1501,13 +1316,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         onCancel={() => setShowMonthClearModal(false)}
       />
 
-      {/* Calendar Export Modal */}
-      <CalendarExportModal
-        isOpen={showCalendarExportModal}
-        onClose={() => setShowCalendarExportModal(false)}
-        currentMonth={currentDate.getMonth()}
-        currentYear={currentDate.getFullYear()}
-      />
+  {/* Calendar export modal removed */}
 
       {/* Import from Roster Modal */}
       {showImportModal && createPortal(
@@ -1595,10 +1404,10 @@ export const Calendar: React.FC<CalendarProps> = ({
                   <Download style={{ width: '24px', height: '24px', color: '#2563eb' }} />
                 </div>
                 <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '8px', margin: 0 }}>
-                  Import Your Roster
+                  Import Your Roster (Disabled)
                 </h3>
                 <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                  Import your assigned shifts from the roster database
+                  Roster import functionality has been removed
                 </p>
               </div>
             </div>
@@ -1831,7 +1640,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       )}
 
       {/* Custom CSS for today's circle animation */}
-      <style>{`
+      <style jsx>{`
         @keyframes todayPulse {
           0%, 100% {
             transform: scale(1);
