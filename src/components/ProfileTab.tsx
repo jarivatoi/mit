@@ -57,6 +57,16 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
         setIsLoading(false)
         return
       }
+      
+      // Skip database fetch for admin users (they don't exist in staff_users table)
+      if (user.isAdmin) {
+        setSurname(user.surname || 'Admin')
+        setName(user.name || 'User')
+        setIdNumber(user.idNumber || '')
+        setIsLoading(false)
+        return
+      }
+      
       try {
         setIsLoading(true)
         const { data, error } = await supabase.from('staff_users').select('*').eq('id', user.id).single()
@@ -76,7 +86,7 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
       }
     }
     fetchMe()
-  }, [user?.id])
+  }, [user?.id, user?.isAdmin])
 
   // Helper function to capitalize surname (ALL CAPS, allows hyphens)
   const capitalizeSurname = (str: string): string => {
