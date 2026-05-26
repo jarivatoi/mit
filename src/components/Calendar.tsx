@@ -154,21 +154,25 @@ export const Calendar: React.FC<CalendarProps> = ({
 
       // Set initial state for shift texts (avoid interfering with ScrollingText)
       const shiftTexts = calendarGridRef.current.querySelectorAll('.shift-text');
-      gsap.set(shiftTexts, {
-        opacity: 0,
-        x: 10,  // Slide from right
-        scale: 0.9,
-        force3D: true
-      });
+      if (shiftTexts.length > 0) {
+        gsap.set(shiftTexts, {
+          opacity: 0,
+          x: 10,  // Slide from right
+          scale: 0.9,
+          force3D: true
+        });
+      }
 
       // Set initial state for special text (avoid interfering with ScrollingText)
       const specialTexts = calendarGridRef.current.querySelectorAll('.special-text');
-      gsap.set(specialTexts, {
-        opacity: 0,
-        scale: 0.9,
-        x: 15,  // Slide from right
-        force3D: true
-      });
+      if (specialTexts.length > 0) {
+        gsap.set(specialTexts, {
+          opacity: 0,
+          scale: 0.9,
+          x: 15,  // Slide from right
+          force3D: true
+        });
+      }
 
       // Create master timeline with smooth TweenMax-style easing
       const masterTl = gsap.timeline({
@@ -1640,7 +1644,7 @@ export const Calendar: React.FC<CalendarProps> = ({
       )}
 
       {/* Custom CSS for today's circle animation */}
-      <style jsx>{`
+      <style>{`
         @keyframes todayPulse {
           0%, 100% {
             transform: scale(1);
