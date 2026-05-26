@@ -974,7 +974,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                               WebkitUserSelect: 'none'
                             }}
                           >
-                            <div className="text-center select-none truncate px-0.5">{shift.label}</div>
+                            <div className="text-center select-none truncate px-0.5">{shift.time}</div>
                           </div>
                         ) : null;
                       })}
@@ -1065,7 +1065,10 @@ export const Calendar: React.FC<CalendarProps> = ({
         isOpen={showClearMonthModal}
         month={currentMonth}
         year={currentYear}
-        onConfirm={() => handleClearMonth(currentYear, currentMonth)}
+        onConfirm={async () => {
+          await handleClearMonth(currentYear, currentMonth);
+          setShowClearMonthModal(false);
+        }}
         onClose={() => setShowClearMonthModal(false)}
       />
 
