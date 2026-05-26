@@ -4,18 +4,18 @@ import { X, AlertTriangle, Trash2 } from 'lucide-react';
 
 interface DeleteMonthModalProps {
   isOpen: boolean;
-  month: number;
-  year: number;
-  onConfirm: () => void;
-  onClose: () => void;
+  selectedMonth: number;
+  selectedYear: number;
+  onConfirm: (year: number, month: number) => void;
+  onCancel: () => void;
 }
 
 export const DeleteMonthModal: React.FC<DeleteMonthModalProps> = ({
   isOpen,
-  month,
-  year,
+  selectedMonth,
+  selectedYear,
   onConfirm,
-  onClose,
+  onCancel,
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -28,14 +28,14 @@ export const DeleteMonthModal: React.FC<DeleteMonthModalProps> = ({
 
   const handleConfirm = () => {
     setIsDeleting(true);
-    onConfirm();
+    onConfirm(selectedYear, selectedMonth);
     setIsDeleting(false);
-    onClose();
+    onCancel();
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      onCancel();
     }
   };
 
@@ -69,7 +69,7 @@ export const DeleteMonthModal: React.FC<DeleteMonthModalProps> = ({
         {/* Header */}
         <div className="relative p-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <button
-            onClick={onClose}
+            onClick={onCancel}
             disabled={isDeleting}
             className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-200 disabled:opacity-50"
           >
@@ -87,7 +87,7 @@ export const DeleteMonthModal: React.FC<DeleteMonthModalProps> = ({
           </h3>
           
           <p className="text-sm text-gray-600 text-center">
-            {monthNames[month]} {year}
+            {monthNames[selectedMonth]} {selectedYear}
           </p>
         </div>
 
@@ -119,7 +119,7 @@ export const DeleteMonthModal: React.FC<DeleteMonthModalProps> = ({
         <div className="border-t border-gray-200 p-6 flex-shrink-0">
           <div className="flex space-x-3">
             <button
-              onClick={onClose}
+              onClick={onCancel}
               disabled={isDeleting}
               className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors duration-200 disabled:opacity-50"
             >
