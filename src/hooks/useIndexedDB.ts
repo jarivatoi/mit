@@ -14,7 +14,7 @@ export function useIndexedDB<T>(
   // Load value from IndexedDB
   const loadValue = useCallback(async () => {
     try {
-      console.log(`🔄 Loading ${storageType} "${key}" from IndexedDB...`);
+
       setIsLoading(true);
       setError(null);
       
@@ -31,7 +31,7 @@ export function useIndexedDB<T>(
           : await workScheduleDB.getMetadata<T>(key);
       }
       
-      console.log(`📦 Retrieved ${storageType} "${key}":`, storedValue);
+
       
       if (storedValue !== null) {
         // Special handling for workSettings to ensure shift combinations are present
@@ -40,7 +40,7 @@ export function useIndexedDB<T>(
           
           // Only fix missing shift combinations if they're actually missing
           if (!settings.shiftCombinations || settings.shiftCombinations.length === 0) {
-            console.log(`🔧 Fixing missing shift combinations for ${key}`);
+
             const fixedSettings = {
               ...settings,
               shiftCombinations: DEFAULT_SHIFT_COMBINATIONS
@@ -49,18 +49,18 @@ export function useIndexedDB<T>(
             // Save the fixed settings back to IndexedDB
             await workScheduleDB.setSetting(key, fixedSettings as T);
             setValue(fixedSettings as T);
-            console.log(`✅ Fixed and saved ${key} with default shift combinations`);
+
           } else {
             setValue(storedValue);
-            console.log(`✅ Loaded ${storageType} "${key}" successfully`);
+
           }
         } else {
           setValue(storedValue);
-          console.log(`✅ Loaded ${storageType} "${key}" successfully`);
+
         }
       } else {
         // If no stored value, use the initial value and save it
-        console.log(`🆕 No stored value for ${storageType} "${key}", using initial value:`, initialValue);
+
         setValue(initialValue);
         
         if (storageType === 'dateNotes') {
@@ -70,10 +70,10 @@ export function useIndexedDB<T>(
         } else {
           await workScheduleDB.setMetadata(key, initialValue);
         }
-        console.log(`💾 Saved initial value for ${storageType} "${key}"`);
+
       }
     } catch (err) {
-      console.error(`❌ Error loading ${key} from IndexedDB:`, err);
+
       setError(err instanceof Error ? err.message : 'Unknown error');
       // On error, still set the initial value so the app doesn't break
       setValue(initialValue);
@@ -97,7 +97,7 @@ export function useIndexedDB<T>(
         ? (newValue as (prev: T) => T)(value) 
         : newValue;
       
-      console.log(`💾 Saving ${storageType} "${key}":`, valueToStore);
+
       setValue(valueToStore);
       
       // Ensure database is initialized before saving
@@ -110,18 +110,18 @@ export function useIndexedDB<T>(
       } else {
         await workScheduleDB.setMetadata(key, valueToStore);
       }
-      console.log(`✅ Saved ${storageType} "${key}" successfully`);
+
       
       // Add a small delay to ensure data is persisted on iPhone
       await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (err) {
-      console.error(`❌ Error saving ${key} to IndexedDB:`, err);
+
       setError(err instanceof Error ? err.message : 'Unknown error');
       
       // On iPhone, sometimes we need to retry
       if (err instanceof Error && err.message.includes('Transaction')) {
-        console.log('🔄 Retrying save operation...');
+
         try {
           await new Promise(resolve => setTimeout(resolve, 500));
           if (storageType === 'dateNotes') {
@@ -131,10 +131,10 @@ export function useIndexedDB<T>(
           } else {
             await workScheduleDB.setMetadata(key, valueToStore);
           }
-          console.log(`✅ Retry successful for ${storageType} "${key}"`);
+
           setError(null);
         } catch (retryErr) {
-          console.error(`❌ Retry failed for ${key}:`, retryErr);
+
         }
       }
     }
@@ -152,7 +152,7 @@ export function useScheduleData() {
   // Load initial data
   const loadData = useCallback(async () => {
     try {
-      console.log('🔄 Loading schedule data from IndexedDB...');
+
       setIsLoading(true);
       setError(null);
       
@@ -163,16 +163,11 @@ export function useScheduleData() {
         workScheduleDB.getSpecialDates()
       ]);
       
-      console.log('📦 Retrieved schedule data:', {
-        scheduleEntries: Object.keys(scheduleData).length,
-        specialDatesEntries: Object.keys(specialDatesData).length
-      });
-      
       setScheduleState(scheduleData);
       setSpecialDatesState(specialDatesData);
-      console.log('✅ Schedule data loaded successfully');
+
     } catch (err) {
-      console.error('❌ Error loading schedule data:', err);
+
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
@@ -192,36 +187,33 @@ export function useScheduleData() {
         ? newSchedule(schedule) 
         : newSchedule;
       
-      console.log('💾 Saving schedule data:', {
-        entries: Object.keys(scheduleToStore).length
-      });
       setScheduleState(scheduleToStore);
       
       // Ensure database is initialized
       await workScheduleDB.init();
       await workScheduleDB.setSchedule(scheduleToStore);
-      console.log('✅ Schedule data saved successfully');
+
       
       // Add delay for iPhone persistence
       await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (err) {
-      console.error('❌ Error saving schedule:', err);
+
       setError(err instanceof Error ? err.message : 'Unknown error');
       
       // Retry logic for iPhone
       if (err instanceof Error && err.message.includes('Transaction')) {
-        console.log('🔄 Retrying schedule save...');
+
         try {
           await new Promise(resolve => setTimeout(resolve, 500));
           const retryData = typeof newSchedule === 'function' 
             ? newSchedule(schedule) 
             : newSchedule;
           await workScheduleDB.setSchedule(retryData);
-          console.log('✅ Schedule retry successful');
+
           setError(null);
         } catch (retryErr) {
-          console.error('❌ Schedule retry failed:', retryErr);
+
         }
       }
     }
@@ -236,36 +228,33 @@ export function useScheduleData() {
         ? newSpecialDates(specialDates) 
         : newSpecialDates;
       
-      console.log('💾 Saving special dates data:', {
-        entries: Object.keys(specialDatesToStore).length
-      });
       setSpecialDatesState(specialDatesToStore);
       
       // Ensure database is initialized
       await workScheduleDB.init();
       await workScheduleDB.setSpecialDates(specialDatesToStore);
-      console.log('✅ Special dates data saved successfully');
+
       
       // Add delay for iPhone persistence
       await new Promise(resolve => setTimeout(resolve, 150));
       
     } catch (err) {
-      console.error('❌ Error saving special dates:', err);
+
       setError(err instanceof Error ? err.message : 'Unknown error');
       
       // Retry logic for iPhone
       if (err instanceof Error && err.message.includes('Transaction')) {
-        console.log('🔄 Retrying special dates save...');
+
         try {
           await new Promise(resolve => setTimeout(resolve, 500));
           const retryData = typeof newSpecialDates === 'function' 
             ? newSpecialDates(specialDates) 
             : newSpecialDates;
           await workScheduleDB.setSpecialDates(retryData);
-          console.log('✅ Special dates retry successful');
+
           setError(null);
         } catch (retryErr) {
-          console.error('❌ Special dates retry failed:', retryErr);
+
         }
       }
     }
