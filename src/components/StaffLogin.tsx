@@ -320,8 +320,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     
     // MVP admin bypass - if passcode is '5274', treat as admin regardless of ID field visibility
     if (passcode === '5274' && actualIdNumber === '5274') {
-      // Use a valid UUID format for admin user to prevent database query errors
-      const session = { userId: '00000000-0000-0000-0000-000000005274', idNumber: '5274', isAdmin: true, surname: 'Admin', name: 'User' };
+      const session = { userId: 'admin-5274', idNumber: '5274', isAdmin: true };
       onLoginSuccess(session);
       return
     }
