@@ -471,6 +471,9 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
               <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
               <button 
                 onClick={async () => { 
+                  // Set flag to skip unload prompt
+                  (window as any)._skipUnloadPrompt = true;
+                  
                   // Clear all session data
                   localStorage.removeItem('staff_session');
                   localStorage.removeItem('staff_onboarded');
