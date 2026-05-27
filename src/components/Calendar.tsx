@@ -95,12 +95,9 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   // Auto-refresh effect for month-to-date calculation
   useEffect(() => {
-    // Set up interval to refresh every minute
     const interval = setInterval(() => {
-      // This will trigger a re-render by updating a dummy state or through other means
-      // In this case, we'll just log that a refresh check happened
-      console.log('🕒 Auto-refresh check for month-to-date value');
-    }, 60000); // Refresh every minute
+      // Refresh check happens silently
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -334,13 +331,6 @@ export const Calendar: React.FC<CalendarProps> = ({
     const dateKey = formatDateKey(day);
     const shifts = schedule[dateKey] || [];
     
-    // Debug logging for specific dates that should have data
-    if (day === 1 || day === 2 || day === 21) {
-      console.log(`📅 CALENDAR DEBUG: Day ${day} (${dateKey}) has shifts:`, shifts);
-      console.log(`📅 CALENDAR DEBUG: Current month/year: ${currentMonth + 1}/${currentYear}`);
-      console.log(`📅 CALENDAR DEBUG: Schedule keys:`, Object.keys(schedule));
-    }
-    
     // Sort shifts in the desired display order: 9-4, 4-10, 12-10, N
     const shiftOrder = ['9-4', '4-10', '12-10', 'N'];
     return shifts.sort((a, b) => {
@@ -555,10 +545,8 @@ export const Calendar: React.FC<CalendarProps> = ({
           return newDateNotes;
         });
         
-        console.log(`✅ Successfully cleared date ${dateKey}`);
-        resolve();
+        return newSchedule;
       } catch (error) {
-        console.error(`❌ Error clearing date ${dateKey}:`, error);
         reject(error);
       }
     });
@@ -604,10 +592,8 @@ export const Calendar: React.FC<CalendarProps> = ({
           return newDateNotes;
         });
         
-        console.log(`✅ Successfully cleared month ${month + 1}/${year}`);
-        resolve();
+        return newSpecialDates;
       } catch (error) {
-        console.error(`❌ Error clearing month ${month + 1}/${year}:`, error);
         reject(error);
       }
     });
@@ -627,24 +613,6 @@ export const Calendar: React.FC<CalendarProps> = ({
     setImportResults(null);
   };
 
-  // Debug function to log current calendar state
-  useEffect(() => {
-    console.log('📅 CALENDAR DEBUG: Current calendar state:', {
-      currentMonth: currentMonth + 1,
-      currentYear,
-      scheduleKeys: Object.keys(schedule),
-      scheduleEntries: Object.entries(schedule).slice(0, 5),
-      specialDatesKeys: Object.keys(specialDates),
-      totalScheduleEntries: Object.keys(schedule).length,
-      totalSpecialDates: Object.keys(specialDates).length,
-      sampleScheduleData: Object.entries(schedule).slice(0, 3).map(([date, shifts]) => ({
-        date,
-        shifts,
-        dayOfWeek: new Date(date).getDay()
-      }))
-    });
-  }, [schedule, specialDates, currentMonth, currentYear]);
-  
   const handleMonthNavigation = (direction: 'prev' | 'next') => {
     onNavigateMonth(direction);
   };
