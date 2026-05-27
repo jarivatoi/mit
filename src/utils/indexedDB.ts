@@ -72,7 +72,7 @@ class WorkScheduleDB {
     return new Promise((resolve, reject) => {
       // Check if IndexedDB is available (important for iPhone)
       if (!window.indexedDB) {
-        console.error('❌ IndexedDB not supported');
+
         reject(new Error('IndexedDB not supported'));
         return;
       }
@@ -80,19 +80,19 @@ class WorkScheduleDB {
       const request = indexedDB.open(this.dbName, this.version);
 
       request.onerror = () => {
-        console.error('❌ Failed to open IndexedDB:', request.error);
+
         reject(new Error(`Failed to open database: ${request.error}`));
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('✅ IndexedDB opened successfully');
+
         resolve();
       };
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        console.log('🔧 Database upgrade needed, version:', event.oldVersion, '->', event.newVersion);
+
 
         // Create object stores
         if (!db.objectStoreNames.contains('schedule')) {
@@ -127,7 +127,7 @@ class WorkScheduleDB {
       // Add timeout for iPhone compatibility
       setTimeout(() => {
         if (!this.db) {
-          console.error('❌ IndexedDB initialization timeout');
+
           reject(new Error('Database initialization timeout'));
         }
       }, 10000); // 10 second timeout
@@ -140,7 +140,7 @@ class WorkScheduleDB {
     }
     if (!this.db) {
       // Database is not initialized, need to reopen
-      console.warn('⚠️ Database not available, reopening...');
+
       this.db = null;
       this.initPromise = null;
       await this.init();
@@ -181,7 +181,7 @@ class WorkScheduleDB {
 
       // Add transaction error handling
       transaction.onerror = () => {
-        console.error('❌ Transaction error:', transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
       
@@ -213,7 +213,7 @@ class WorkScheduleDB {
             addRequest.onerror = () => {
               if (!hasError) {
                 hasError = true;
-                console.error(`❌ Failed to add schedule for ${date}:`, addRequest.error);
+
                 reject(new Error(`Failed to add schedule for ${date}: ${addRequest.error}`));
               }
             };
@@ -222,12 +222,12 @@ class WorkScheduleDB {
         
         // If no data to save, resolve immediately
         if (pendingOperations === 0) {
-          console.log('✅ No schedule data to save');
+
         }
       };
 
       clearRequest.onerror = () => {
-        console.error('❌ Failed to clear schedule:', clearRequest.error);
+
         reject(new Error(`Failed to clear schedule: ${clearRequest.error}`));
       };
     });
@@ -263,7 +263,7 @@ class WorkScheduleDB {
 
       // Add transaction error handling
       transaction.onerror = () => {
-        console.error('❌ Special dates transaction error:', transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
       
@@ -295,7 +295,7 @@ class WorkScheduleDB {
             addRequest.onerror = () => {
               if (!hasError) {
                 hasError = true;
-                console.error(`❌ Failed to add special date for ${date}:`, addRequest.error);
+
                 reject(new Error(`Failed to add special date for ${date}: ${addRequest.error}`));
               }
             };
@@ -309,7 +309,7 @@ class WorkScheduleDB {
       };
 
       clearRequest.onerror = () => {
-        console.error('❌ Failed to clear special dates:', clearRequest.error);
+
         reject(new Error(`Failed to clear special dates: ${clearRequest.error}`));
       };
     });
@@ -334,9 +334,9 @@ class WorkScheduleDB {
             };
             
             // Save the fixed version back to the database
-            this.setSetting(key, fixedResult).catch(err => 
-              console.error('Failed to save fixed settings:', err)
-            );
+            this.setSetting(key, fixedResult).catch(err => {
+              // Error handling
+            });
             
             resolve(fixedResult);
             return;
@@ -361,7 +361,7 @@ class WorkScheduleDB {
       
       // Add transaction error handling
       transaction.onerror = () => {
-        console.error(`❌ Settings transaction error for "${key}":`, transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
       
@@ -376,7 +376,7 @@ class WorkScheduleDB {
       };
 
       request.onerror = () => {
-        console.error(`❌ Failed to set setting "${key}":`, request.error);
+
         reject(new Error(`Failed to set setting: ${key} - ${request.error}`));
       };
     });
@@ -407,7 +407,7 @@ class WorkScheduleDB {
       const store = transaction.objectStore('metadata');
       
       transaction.onerror = () => {
-        console.error(`❌ Metadata transaction error for "${key}":`, transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
       
@@ -422,7 +422,7 @@ class WorkScheduleDB {
       };
 
       request.onerror = () => {
-        console.error(`❌ Failed to set metadata "${key}":`, request.error);
+
         reject(new Error(`Failed to set metadata: ${key} - ${request.error}`));
       };
     });
@@ -457,7 +457,7 @@ class WorkScheduleDB {
       const store = transaction.objectStore('dateNotes');
 
       transaction.onerror = () => {
-        console.error('❌ Date notes transaction error:', transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
       
@@ -487,7 +487,7 @@ class WorkScheduleDB {
             addRequest.onerror = () => {
               if (!hasError) {
                 hasError = true;
-                console.error(`❌ Failed to add date note for ${date}:`, addRequest.error);
+
                 reject(new Error(`Failed to add date note for ${date}: ${addRequest.error}`));
               }
             };
@@ -500,7 +500,7 @@ class WorkScheduleDB {
       };
 
       clearRequest.onerror = () => {
-        console.error('❌ Failed to clear date notes:', clearRequest.error);
+
         reject(new Error(`Failed to clear date notes: ${clearRequest.error}`));
       };
     });
@@ -514,7 +514,7 @@ class WorkScheduleDB {
       const store = transaction.objectStore('userSessions');
       
       transaction.onerror = () => {
-        console.error('❌ Save session transaction error:', transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
       
@@ -529,7 +529,7 @@ class WorkScheduleDB {
       };
       
       request.onerror = () => {
-        console.error('❌ Failed to save user session:', request.error);
+
         reject(new Error(`Failed to save user session: ${request.error}`));
       };
     });
@@ -547,7 +547,7 @@ class WorkScheduleDB {
       };
       
       request.onerror = () => {
-        console.error('❌ Failed to get user session:', request.error);
+
         reject(new Error(`Failed to get user session: ${request.error}`));
       };
     });
@@ -566,7 +566,7 @@ class WorkScheduleDB {
       };
       
       request.onerror = () => {
-        console.error('❌ Failed to remove user session:', request.error);
+
         reject(new Error(`Failed to remove user session: ${request.error}`));
       };
     });
@@ -590,7 +590,7 @@ class WorkScheduleDB {
       };
       
       request.onerror = () => {
-        console.error('❌ Failed to save ID number:', request.error);
+
         reject(new Error(`Failed to save ID number: ${request.error}`));
       };
       
@@ -599,7 +599,7 @@ class WorkScheduleDB {
       };
       
       transaction.onerror = () => {
-        console.error('❌ Save ID number transaction error:', transaction.error);
+
         reject(new Error(`Transaction failed: ${transaction.error}`));
       };
     });
@@ -618,7 +618,7 @@ class WorkScheduleDB {
       };
       
       request.onerror = () => {
-        console.error('❌ Failed to get last used ID number:', request.error);
+
         reject(new Error(`Failed to get last used ID number: ${request.error}`));
       };
     });
