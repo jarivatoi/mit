@@ -148,7 +148,7 @@ export class AddToHomescreen {
 
   show(customMessage?: string): void {
     if (!this.canPrompt() && !this.options.mustShowCustomPrompt) {
-      console.log('🚫 AddToHomescreen: Cannot show prompt');
+
       return;
     }
 
