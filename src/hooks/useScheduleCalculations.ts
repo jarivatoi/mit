@@ -264,15 +264,12 @@ export const useScheduleCalculations = (
               
               if (includeMultiShift) {
                 monthToDate += difference;
-                console.log(`📈 Added multi-shift to month-to-date: Rs ${difference.toFixed(2)}`);
               }
             }
           }
         }
       }
     });
-    
-    console.log(`🎯 Final totals: Monthly=${total.toFixed(2)}, MTD=${monthToDate.toFixed(2)}`);
     
     return { totalAmount: total, monthToDateAmount: monthToDate };
   }, [
