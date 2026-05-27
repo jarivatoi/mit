@@ -586,7 +586,7 @@ class WorkScheduleDB {
       });
       
       request.onsuccess = () => {
-        console.log('✅ Last used ID number saved:', idNumber);
+        // Success
       };
       
       request.onerror = () => {
