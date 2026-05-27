@@ -100,8 +100,6 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
         const dateElement = document.querySelector(`[data-day="${dayNumber}"]`) as HTMLElement;
         
         if (dateElement) {
-          console.log(`📍 Scrolling back to date ${dayNumber}`);
-          
           // Scroll the element into view with smooth behavior
           dateElement.scrollIntoView({
             behavior: 'smooth',
@@ -120,7 +118,7 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
             dateElement.style.boxShadow = '';
           }, 600);
         } else {
-          console.warn(`⚠️ Could not find date element for day ${dayNumber}`);
+          // Element not found
         }
       }, 100); // Small delay to ensure modal close animation completes
     } else {
