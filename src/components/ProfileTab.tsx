@@ -57,6 +57,16 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
         setIsLoading(false)
         return
       }
+      
+      // Skip database fetch for admin users (they don't exist in staff_users table)
+      if (user.isAdmin) {
+        setSurname(user.surname || 'Admin')
+        setName(user.name || 'User')
+        setIdNumber(user.idNumber || '')
+        setIsLoading(false)
+        return
+      }
+      
       try {
         setIsLoading(true)
         const { data, error } = await supabase.from('staff_users').select('*').eq('id', user.id).single()
@@ -76,7 +86,7 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
       }
     }
     fetchMe()
-  }, [user?.id])
+  }, [user?.id, user?.isAdmin])
 
   // Helper function to capitalize surname (ALL CAPS, allows hyphens)
   const capitalizeSurname = (str: string): string => {
@@ -461,14 +471,6 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
               <button onClick={deleteProfile} style={{ ...buttonStyle, background: '#ef4444', marginTop: 12 }}>Delete Profile</button>
               <button 
                 onClick={async () => { 
-                  // Save any pending data first
-                  try {
-                    const { workScheduleDB } = await import('../utils/indexedDB');
-                    await workScheduleDB.init();
-                  } catch (error) {
-                    console.warn('Error initializing DB before logout:', error);
-                  }
-                  
                   // Clear all session data
                   localStorage.removeItem('staff_session');
                   localStorage.removeItem('staff_onboarded');
