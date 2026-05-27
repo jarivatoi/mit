@@ -545,7 +545,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           return newDateNotes;
         });
         
-        return newSchedule;
+        resolve();
       } catch (error) {
         reject(error);
       }
@@ -592,7 +592,7 @@ export const Calendar: React.FC<CalendarProps> = ({
           return newDateNotes;
         });
         
-        return newSpecialDates;
+        resolve();
       } catch (error) {
         reject(error);
       }
