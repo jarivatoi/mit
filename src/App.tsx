@@ -113,6 +113,9 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
   // Force save on page close/refresh for Android reliability
   useEffect(() => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      // Skip prompt if logging out intentionally
+      if ((window as any)._skipUnloadPrompt) return;
+      
       // Modern browsers ignore custom messages but still trigger the event
       e.preventDefault();
       
