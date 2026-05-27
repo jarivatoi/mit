@@ -164,13 +164,23 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
   useEffect(() => {
     const loadLastId = async () => {
       try {
+        console.log('🔍 Attempting to load last used ID number from IndexedDB...');
         const lastId = await getLastUsedIdNumber();
+        console.log('📦 Loaded ID from IndexedDB:', lastId);
         if (lastId) {
+          console.log('✅ Setting ID number field to:', lastId);
           setIdNumber(lastId);
+        } else {
+          console.log('⚠️ No ID found in IndexedDB, checking localStorage...');
+          const fallbackId = localStorage.getItem('last_used_id_number');
+          console.log('📦 Loaded ID from localStorage:', fallbackId);
+          if (fallbackId) {
+            setIdNumber(fallbackId);
+          }
         }
       } catch (error) {
-        console.warn('Could not load last used ID number from IndexedDB, falling back to localStorage:', error);
-        // Fallback to localStorage if IndexedDB fails
+        console.error('❌ Error loading from IndexedDB:', error);
+        console.warn('Falling back to localStorage...');
         const fallbackId = localStorage.getItem('last_used_id_number');
         if (fallbackId) {
           setIdNumber(fallbackId);
@@ -322,6 +332,19 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
     if (passcode === '5274' && actualIdNumber === '5274') {
       // Use a valid UUID format for admin user to prevent database query errors
       const session = { userId: '00000000-0000-0000-0000-000000005274', idNumber: '5274', isAdmin: true, surname: 'Admin', name: 'User' };
+      
+      // Save the ID number for future logins
+      console.log('💾 Admin login: Attempting to save ID number to IndexedDB:', '5274');
+      try {
+        await saveLastUsedIdNumber('5274');
+        console.log('✅ Admin login: Successfully saved ID number to IndexedDB');
+      } catch (error) {
+        console.warn('❌ Admin login: Could not save ID number to IndexedDB:', error);
+        console.log('💾 Admin login: Falling back to localStorage...');
+        localStorage.setItem('last_used_id_number', '5274');
+        console.log('✅ Admin login: Saved ID number to localStorage');
+      }
+      
       onLoginSuccess(session);
       return
     }
@@ -367,12 +390,15 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
       if (hashed !== row.passcode_hash) throw new Error('Incorrect passcode')
       await (await import('../lib/supabase')).supabase.from('staff_users').update({ last_login: new Date().toISOString() }).eq('id', row.id)
       // Store the ID number in IndexedDB for future logins
+      console.log('💾 Attempting to save ID number to IndexedDB:', row.id_number);
       try {
         await saveLastUsedIdNumber(row.id_number);
+        console.log('✅ Successfully saved ID number to IndexedDB');
       } catch (error) {
-        console.warn('Could not save ID number to IndexedDB, falling back to localStorage:', error);
-        // Fallback to localStorage if IndexedDB fails
+        console.warn('❌ Could not save ID number to IndexedDB:', error);
+        console.log('💾 Falling back to localStorage...');
         localStorage.setItem('last_used_id_number', row.id_number);
+        console.log('✅ Saved ID number to localStorage');
       }
       onLoginSuccess({ 
         userId: row.id, 
