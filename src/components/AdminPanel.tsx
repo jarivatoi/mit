@@ -184,6 +184,9 @@ const AdminPanel: React.FC = () => {
             console.warn('Error initializing DB before logout:', error);
           }
           
+          // Set flag to skip unload prompt
+          (window as any)._skipUnloadPrompt = true;
+          
           // Clear all session data
           localStorage.removeItem('staff_session');
           localStorage.removeItem('staff_onboarded');
