@@ -32,24 +32,6 @@ export const useScheduleCalculations = (
     // IMPORTANT: For future years, hourly rate must also be 0 unless a monthly salary is explicitly set
     const effectiveHourlyRate = effectiveSalary > 0 ? (effectiveSalary * 12) / 52 / 40 : 0;
 
-    console.log('🔄 Calculating amounts with data:', {
-      viewingYear,
-      actualCurrentYear,
-      isFutureYear,
-      isPastYear,
-      monthlySalary,
-      shouldUseGlobalSalary,
-      scheduleKeys: Object.keys(schedule || {}),
-      scheduleCount: Object.keys(schedule || {}).length,
-      settingsBasicSalary: settings?.basicSalary,
-      effectiveSalary: effectiveSalary,
-      effectiveHourlyRate: effectiveHourlyRate,
-      settingsHourlyRate: settings?.hourlyRate,
-      settingsCombinations: settings?.shiftCombinations?.length,
-      specialDatesCount: Object.keys(specialDates || {}).length,
-      refreshKey
-    });
-
     let total = 0;
     let monthToDate = 0;
     const now = new Date();
@@ -60,21 +42,15 @@ export const useScheduleCalculations = (
     
     // Early return if no schedule data or settings
     if (!schedule || Object.keys(schedule).length === 0) {
-      console.log('❌ No schedule data available');
       return { totalAmount: 0, monthToDateAmount: 0 };
     }
     
     if (!settings || !settings.shiftCombinations || settings.shiftCombinations.length === 0) {
-      console.log('❌ No settings or shift combinations available');
       return { totalAmount: 0, monthToDateAmount: 0 };
     }
-
-    console.log('✅ Processing schedule entries...');
     
     Object.entries(schedule).forEach(([dateKey, dayShifts]) => {
       if (!dayShifts || dayShifts.length === 0) return;
-      
-      console.log(`📅 Processing date ${dateKey} with shifts:`, dayShifts);
       
       // Parse the date to check if it belongs to the currently viewed month/year
       const workDate = new Date(dateKey);
@@ -83,7 +59,6 @@ export const useScheduleCalculations = (
       
       // Only include dates from the currently viewed month/year
       if (workMonth !== currentMonth || workYear !== currentYear) {
-        console.log(`⏭️ Skipping ${dateKey} - not in current month/year`);
         return;
       }
       
@@ -91,12 +66,8 @@ export const useScheduleCalculations = (
       const isSpecialDate = specialDates && specialDates[dateKey] === true;
       const dayOfWeek = workDate.getDay();
       
-      console.log(`📊 Date ${dateKey}: dayOfWeek=${dayOfWeek}, isSpecial=${isSpecialDate}`);
-      
       // Calculate each shift individually for proper amount calculation
       dayShifts.forEach(shiftId => {
-        console.log(`💰 Calculating shift: ${shiftId}`);
-        
         // Find the shift combination - handle single shifts and combinations
         let combination = settings.shiftCombinations.find(combo => {
           const comboKey = combo.id.replace(/AM/g, '9-4'); // Handle AM alias
@@ -109,8 +80,6 @@ export const useScheduleCalculations = (
             ? combination.manualAmount
             : combination.hours * effectiveHourlyRate;
           total += shiftAmount;
-          
-          console.log(`💰 Found single shift ${combination.combination} (${combination.hours}h) = Rs ${shiftAmount.toFixed(2)}`);
           
           // Check if this date should be included in month-to-date calculation
           // Modified logic: Include today's shifts based on shift end time
@@ -136,7 +105,6 @@ export const useScheduleCalculations = (
               
               if (includePreviousDayShift) {
                 monthToDate += shiftAmount;
-                console.log(`📈 Added to month-to-date (previous day): Rs ${shiftAmount.toFixed(2)}`);
               }
             } 
             // If it's today, include based on shift end time
@@ -184,14 +152,11 @@ export const useScheduleCalculations = (
               
               if (includeShift) {
                 monthToDate += shiftAmount;
-                console.log(`📈 Added to month-to-date (today, shift ended): Rs ${shiftAmount.toFixed(2)}`);
-              } else {
-                console.log(`⏭️ Not adding to month-to-date (today, shift not ended yet): ${shiftId}`);
               }
             }
           }
         } else {
-          console.log(`❌ No single shift combination found for ${shiftId}`);
+          // No combination found
         }
       });
       
@@ -199,8 +164,6 @@ export const useScheduleCalculations = (
       if (dayShifts.length > 1) {
         const sortedShifts = [...dayShifts].sort();
         const combinationKey = sortedShifts.join('+');
-        
-        console.log(`🔍 Looking for multi-shift combination: ${combinationKey}`);
         
         const multiCombination = settings.shiftCombinations.find(combo => {
           const comboKey = combo.id.replace(/AM/g, '9-4');
@@ -225,8 +188,6 @@ export const useScheduleCalculations = (
           const difference = multiAmount - individualTotal;
           
           total += difference;
-          
-          console.log(`💰 Found multi-combination ${multiCombination.combination}, adjusting by Rs ${difference.toFixed(2)}`);
           
           // Apply same logic for month-to-date calculation with multi-shifts
           if (workMonth === now.getMonth() && workYear === now.getFullYear()) {
