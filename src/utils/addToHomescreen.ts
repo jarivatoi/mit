@@ -70,18 +70,6 @@ export class AddToHomescreen {
     
     this.isStandaloneMode = this.isStandalone();
     
-    console.log('🔍 AddToHomescreen Detection:', {
-      isIOS: this.isIOS,
-      isAndroid: this.isAndroid,
-      isMobile: this.isMobile,
-      isChrome: this.isChrome,
-      isSafari: this.isSafari,
-      isSamsung: this.isSamsung,
-      isFirefox: this.isFirefox,
-      isStandalone: this.isStandaloneMode,
-      userAgent: ua
-    });
-    
     // Load display count from localStorage
     const stored = localStorage.getItem('addToHomescreenModalCount');
     this.modalDisplayCount = stored ? parseInt(stored, 10) : 0;
@@ -100,17 +88,6 @@ export class AddToHomescreen {
     // Additional checks for installed PWA
     const hasStandaloneInURL = window.location.search.includes('standalone=true');
     const isInWebApk = 'matchMedia' in window && window.matchMedia('(display-mode: standalone)').matches && window.navigator.userAgent.includes('wv');
-    
-    console.log('📱 Standalone Detection:', {
-      isStandaloneDisplay,
-      isIOSStandalone,
-      isAndroidStandalone,
-      isFullscreen,
-      isMinimalUI,
-      hasStandaloneInURL,
-      isInWebApk,
-      userAgent: navigator.userAgent
-    });
     
     return isStandaloneDisplay || 
            isIOSStandalone || 
@@ -132,18 +109,7 @@ export class AddToHomescreen {
                    this.isMobile &&
                    (this.isAndroid || this.isIOS); // Explicitly check for Android or iOS
     
-    console.log('✅ Can Prompt Check:', {
-      isStandalone: this.isStandaloneMode,
-      hasBeenShown: hasBeenShown,
-      displayCount: this.modalDisplayCount,
-      maxCount: this.maxModalDisplayCount,
-      isMobile: this.isMobile,
-      isAndroid: this.isAndroid,
-      isIOS: this.isIOS,
-      canShow
-    });
-    
-    return canShow || this.options.mustShowCustomPrompt;
+    return !!canShow || !!this.options.mustShowCustomPrompt;
   }
 
   show(customMessage?: string): void {
