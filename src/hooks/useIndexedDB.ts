@@ -1,289 +1,277 @@
-import { useMemo } from 'react';
-import { DaySchedule, Settings, SpecialDates } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import { workScheduleDB } from '../utils/indexedDB';
+import { DEFAULT_SHIFT_COMBINATIONS } from '../constants';
 
-export const useScheduleCalculations = (
-  schedule: DaySchedule,
-  settings: Settings,
-  specialDates: SpecialDates,
-  currentDate?: Date,
-  refreshKey?: number, // Add refresh key parameter
-  monthlySalary?: number // Add monthly salary parameter
-) => {
-  const { totalAmount, monthToDateAmount } = useMemo(() => {
-    // Determine effective salary: use monthlySalary if set (> 0),
-    // otherwise use global basicSalary ONLY for current year (NOT past or future)
-    const today = new Date();
-    const viewingYear = currentDate ? currentDate.getFullYear() : today.getFullYear();
-    const actualCurrentYear = today.getFullYear();
-    const isFutureYear = viewingYear > actualCurrentYear;
-    const isPastYear = viewingYear < actualCurrentYear;
+export function useIndexedDB<T>(
+  key: string,
+  initialValue: T,
+  storageType: 'setting' | 'metadata' | 'dateNotes' = 'setting'
+) {
+  const [value, setValue] = useState<T>(initialValue);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // Only apply global salary to current year's unedited months
-    // Past years must have explicit monthly salaries or remain at 0
-    // Future years always remain at 0 unless explicitly set
-    const shouldUseGlobalSalary = (monthlySalary === undefined || monthlySalary === null || monthlySalary === 0)
-                                  && !isFutureYear
-                                  && !isPastYear;
-    const effectiveSalary = monthlySalary && monthlySalary > 0
-      ? monthlySalary
-      : (shouldUseGlobalSalary ? settings?.basicSalary || 0 : 0);
-
-    // Recalculate hourly rate based on effective salary
-    // IMPORTANT: For future years, hourly rate must also be 0 unless a monthly salary is explicitly set
-    const effectiveHourlyRate = effectiveSalary > 0 ? (effectiveSalary * 12) / 52 / 40 : 0;
-
-    let total = 0;
-    let monthToDate = 0;
-    const now = new Date();
-
-    // Get current month and year for filtering
-    const currentMonth = currentDate ? currentDate.getMonth() : now.getMonth();
-    const currentYear = currentDate ? currentDate.getFullYear() : now.getFullYear();
-    
-    // Early return if no schedule data or settings
-    if (!schedule || Object.keys(schedule).length === 0) {
-      return { totalAmount: 0, monthToDateAmount: 0 };
-    }
-    
-    if (!settings || !settings.shiftCombinations || settings.shiftCombinations.length === 0) {
-      return { totalAmount: 0, monthToDateAmount: 0 };
-    }
-    
-    Object.entries(schedule).forEach(([dateKey, dayShifts]) => {
-      if (!dayShifts || dayShifts.length === 0) return;
+  // Load value from IndexedDB
+  const loadValue = useCallback(async () => {
+    try {
+      console.log(`🔄 Loading ${storageType} "${key}" from IndexedDB...`);
+      setIsLoading(true);
+      setError(null);
       
-      // Parse the date to check if it belongs to the currently viewed month/year
-      const workDate = new Date(dateKey);
-      const workMonth = workDate.getMonth();
-      const workYear = workDate.getFullYear();
+      await workScheduleDB.init();
       
-      // Only include dates from the currently viewed month/year
-      if (workMonth !== currentMonth || workYear !== currentYear) {
-        return;
+      let storedValue: T | null;
+      
+      if (storageType === 'dateNotes') {
+        // Special handling for dateNotes
+        storedValue = await workScheduleDB.getDateNotes() as unknown as T;
+      } else {
+        storedValue = storageType === 'setting' 
+          ? await workScheduleDB.getSetting<T>(key)
+          : await workScheduleDB.getMetadata<T>(key);
       }
       
-      // Check if this date is marked as special
-      const isSpecialDate = specialDates && specialDates[dateKey] === true;
-      const dayOfWeek = workDate.getDay();
+      console.log(`📦 Retrieved ${storageType} "${key}":`, storedValue);
       
-      // Calculate each shift individually for proper amount calculation
-      dayShifts.forEach(shiftId => {
-        // Find the shift combination - handle single shifts and combinations
-        let combination = settings.shiftCombinations.find(combo => {
-          const comboKey = combo.id.replace(/AM/g, '9-4'); // Handle AM alias
-          return comboKey === shiftId;
-        });
-        
-        if (combination && (effectiveHourlyRate || (settings.useManualMode && combination.useManualAmount))) {
-          // Use manual amount if enabled, otherwise calculate from hours
-          const shiftAmount = settings.useManualMode && combination.useManualAmount && combination.manualAmount !== undefined
-            ? combination.manualAmount
-            : combination.hours * effectiveHourlyRate;
-          total += shiftAmount;
+      if (storedValue !== null) {
+        // Special handling for workSettings to ensure shift combinations are present
+        if (key === 'workSettings' && typeof storedValue === 'object' && storedValue !== null) {
+          const settings = storedValue as any;
           
-          // Check if this date should be included in month-to-date calculation
-          // Modified logic: Include today's shifts based on shift end time
-          if (workMonth === now.getMonth() && workYear === now.getFullYear()) {
-            const workDay = workDate.getDate();
-            const today = now.getDate();
+          // Only fix missing shift combinations if they're actually missing
+          if (!settings.shiftCombinations || settings.shiftCombinations.length === 0) {
+            console.log(`🔧 Fixing missing shift combinations for ${key}`);
+            const fixedSettings = {
+              ...settings,
+              shiftCombinations: DEFAULT_SHIFT_COMBINATIONS
+            };
             
-            // If it's a previous day, always include - EXCEPT for night shifts which have special handling
-            if (workDay < today) {
-              // Special handling ONLY for night shifts on previous days
-              let includePreviousDayShift = true;
-              if (shiftId === 'N') {
-                // For night shifts on previous days, we still need to check the cutoff time
-                // Night shift starts on workDate and ends at 9 AM the next day
-                const workDateObj = new Date(workDate);
-                const cutoffDate = new Date(workDateObj);
-                cutoffDate.setDate(cutoffDate.getDate() + 1); // Next day
-                cutoffDate.setHours(9, 0, 0, 0); // 9:00 AM
-                
-                // Include if current time is past the cutoff
-                includePreviousDayShift = now >= cutoffDate;
-              }
-              
-              if (includePreviousDayShift) {
-                monthToDate += shiftAmount;
-              }
-            } 
-            // If it's today, include based on shift end time
-            else if (workDay === today) {
-              // Get current time components
-              const currentHour = now.getHours();
-              const currentMinute = now.getMinutes();
-              
-              // Determine shift end time based on shift type
-              let shiftEndTimeHour = 0;
-              switch(shiftId) {
-                case '9-4':
-                  shiftEndTimeHour = 16; // 4 PM
-                  break;
-                case '4-10':
-                  shiftEndTimeHour = 22; // 10 PM
-                  break;
-                case '12-10':
-                  shiftEndTimeHour = 22; // 10 PM
-                  break;
-                case 'N':
-                  shiftEndTimeHour = 9; // 9 AM (next day)
-                  break;
-                default:
-                  shiftEndTimeHour = 16; // Default to 4 PM
-              }
-              
-              // Special handling for night shift (ends next day)
-              let includeShift = false;
-              if (shiftId === 'N') {
-                // Night shift starts on workDate and ends at 9 AM the next day
-                // So we should include it in month-to-date only after 9 AM the next day
-                const workDateObj = new Date(workDate);
-                const cutoffDate = new Date(workDateObj);
-                cutoffDate.setDate(cutoffDate.getDate() + 1); // Next day
-                cutoffDate.setHours(9, 0, 0, 0); // 9:00 AM
-                
-                // Include if current time is past the cutoff
-                includeShift = now >= cutoffDate;
-              } else {
-                // Other shifts end on the same day
-                includeShift = (currentHour > shiftEndTimeHour) || 
-                              (currentHour === shiftEndTimeHour && currentMinute >= 0);
-              }
-              
-              if (includeShift) {
-                monthToDate += shiftAmount;
-              }
-            }
+            // Save the fixed settings back to IndexedDB
+            await workScheduleDB.setSetting(key, fixedSettings as T);
+            setValue(fixedSettings as T);
+            console.log(`✅ Fixed and saved ${key} with default shift combinations`);
+          } else {
+            setValue(storedValue);
+            console.log(`✅ Loaded ${storageType} "${key}" successfully`);
           }
         } else {
-          // No combination found
+          setValue(storedValue);
+          console.log(`✅ Loaded ${storageType} "${key}" successfully`);
         }
-      });
+      } else {
+        // If no stored value, use the initial value and save it
+        console.log(`🆕 No stored value for ${storageType} "${key}", using initial value:`, initialValue);
+        setValue(initialValue);
+        
+        if (storageType === 'dateNotes') {
+          await workScheduleDB.setDateNotes(initialValue as unknown as Record<string, string>);
+        } else if (storageType === 'setting') {
+          await workScheduleDB.setSetting(key, initialValue);
+        } else {
+          await workScheduleDB.setMetadata(key, initialValue);
+        }
+        console.log(`💾 Saved initial value for ${storageType} "${key}"`);
+      }
+    } catch (err) {
+      console.error(`❌ Error loading ${key} from IndexedDB:`, err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      // On error, still set the initial value so the app doesn't break
+      setValue(initialValue);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [key, storageType, JSON.stringify(initialValue)]); // Include serialized initialValue
+
+  // Load initial value from IndexedDB
+  useEffect(() => {
+    loadValue();
+  }, [loadValue]);
+
+  // Update value and save to IndexedDB
+  const updateValue = useCallback(async (newValue: T | ((prev: T) => T)) => {
+    let valueToStore: T = value; // Initialize with current value as fallback
+    
+    try {
+      setError(null);
+      valueToStore = typeof newValue === 'function' 
+        ? (newValue as (prev: T) => T)(value) 
+        : newValue;
       
-      // Also check for multi-shift combinations (for backward compatibility)
-      if (dayShifts.length > 1) {
-        const sortedShifts = [...dayShifts].sort();
-        const combinationKey = sortedShifts.join('+');
-        
-        const multiCombination = settings.shiftCombinations.find(combo => {
-          const comboKey = combo.id.replace(/AM/g, '9-4');
-          return comboKey === combinationKey;
-        });
-        
-        if (multiCombination && (effectiveHourlyRate || (settings.useManualMode && multiCombination.useManualAmount))) {
-          // Subtract individual shift amounts already added
-          const individualTotal = dayShifts.reduce((sum, shiftId) => {
-            const singleCombo = settings.shiftCombinations.find(combo => combo.id === shiftId);
-            // Use manual amount if enabled for individual shifts
-            const shiftAmount = settings.useManualMode && singleCombo?.useManualAmount && singleCombo.manualAmount !== undefined
-              ? singleCombo.manualAmount
-              : (singleCombo ? singleCombo.hours * effectiveHourlyRate : 0);
-            return sum + shiftAmount;
-          }, 0);
-          
-          // Use manual amount for multi-combination if enabled
-          const multiAmount = settings.useManualMode && multiCombination.useManualAmount && multiCombination.manualAmount !== undefined
-            ? multiCombination.manualAmount
-            : multiCombination.hours * effectiveHourlyRate;
-          const difference = multiAmount - individualTotal;
-          
-          total += difference;
-          
-          // Apply same logic for month-to-date calculation with multi-shifts
-          if (workMonth === now.getMonth() && workYear === now.getFullYear()) {
-            const workDay = workDate.getDate();
-            const today = now.getDate();
-            
-            // If it's a previous day, always include - EXCEPT for night shifts which have special handling
-            if (workDay < today) {
-              // Special handling ONLY for multi-shifts containing night shifts on previous days
-              let includePreviousDayMultiShift = true;
-              if (dayShifts.includes('N')) {
-                // For night shifts on previous days, we still need to check the cutoff time
-                // Night shift starts on workDate and ends at 9 AM the next day
-                const workDateObj = new Date(workDate);
-                const cutoffDate = new Date(workDateObj);
-                cutoffDate.setDate(cutoffDate.getDate() + 1); // Next day
-                cutoffDate.setHours(9, 0, 0, 0); // 9:00 AM
-                
-                // Include if current time is past the cutoff
-                includePreviousDayMultiShift = now >= cutoffDate;
-              }
-              
-              if (includePreviousDayMultiShift) {
-                monthToDate += difference;
-              }
-            } 
-            // If it's today, include based on shift end time (improved logic)
-            else if (workDay === today) {
-              // For multi-shift combinations:
-              // Each shift in the combination should be evaluated independently
-              // The combination is included only when ALL shifts in it can be included
-              let includeMultiShift = true;
-              
-              // Check each shift in the combination
-              for (const shiftId of dayShifts) {
-                if (shiftId === 'N') {
-                  // Night shift condition - must be after 9 AM the following day
-                  const workDateObj = new Date(workDate);
-                  const cutoffDate = new Date(workDateObj);
-                  cutoffDate.setDate(cutoffDate.getDate() + 1); // Next day
-                  cutoffDate.setHours(9, 0, 0, 0); // 9:00 AM
-                  
-                  if (now < cutoffDate) {
-                    includeMultiShift = false;
-                    break;
-                  }
-                } else {
-                  // Regular shift condition - must be after its end time
-                  let shiftEndTimeHour = 0;
-                  switch(shiftId) {
-                    case '9-4':
-                      shiftEndTimeHour = 16; // 4 PM
-                      break;
-                    case '4-10':
-                      shiftEndTimeHour = 22; // 10 PM
-                      break;
-                    case '12-10':
-                      shiftEndTimeHour = 22; // 10 PM
-                      break;
-                    default:
-                      shiftEndTimeHour = 16; // Default to 4 PM
-                  }
-                  
-                  const currentHour = now.getHours();
-                  const currentMinute = now.getMinutes();
-                  
-                  if (!((currentHour > shiftEndTimeHour) || 
-                        (currentHour === shiftEndTimeHour && currentMinute >= 0))) {
-                    includeMultiShift = false;
-                    break;
-                  }
-                }
-              }
-              
-              if (includeMultiShift) {
-                monthToDate += difference;
-              }
-            }
+      console.log(`💾 Saving ${storageType} "${key}":`, valueToStore);
+      setValue(valueToStore);
+      
+      // Ensure database is initialized before saving
+      await workScheduleDB.init();
+      
+      if (storageType === 'dateNotes') {
+        await workScheduleDB.setDateNotes(valueToStore as unknown as Record<string, string>);
+      } else if (storageType === 'setting') {
+        await workScheduleDB.setSetting(key, valueToStore);
+      } else {
+        await workScheduleDB.setMetadata(key, valueToStore);
+      }
+      console.log(`✅ Saved ${storageType} "${key}" successfully`);
+      
+      // Add a small delay to ensure data is persisted on iPhone
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (err) {
+      console.error(`❌ Error saving ${key} to IndexedDB:`, err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      
+      // On iPhone, sometimes we need to retry
+      if (err instanceof Error && err.message.includes('Transaction')) {
+        console.log('🔄 Retrying save operation...');
+        try {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          if (storageType === 'dateNotes') {
+            await workScheduleDB.setDateNotes(valueToStore as unknown as Record<string, string>);
+          } else if (storageType === 'setting') {
+            await workScheduleDB.setSetting(key, valueToStore);
+          } else {
+            await workScheduleDB.setMetadata(key, valueToStore);
           }
+          console.log(`✅ Retry successful for ${storageType} "${key}"`);
+          setError(null);
+        } catch (retryErr) {
+          console.error(`❌ Retry failed for ${key}:`, retryErr);
         }
       }
-    });
-    
-    return { totalAmount: total, monthToDateAmount: monthToDate };
-  }, [
-    schedule,
-    settings,
-    specialDates,
-    currentDate,
-    refreshKey,
-    monthlySalary,
-    // Add these to ensure recalculation when data structure changes
-    JSON.stringify(schedule),
-    JSON.stringify(settings),
-    JSON.stringify(specialDates)
-  ]);
+    }
+  }, [key, value, storageType]);
 
-  return { totalAmount, monthToDateAmount };
-}; 
+  return [value, updateValue, { isLoading, error, refresh: loadValue }] as const;
+}
+
+export function useScheduleData() {
+  const [schedule, setSchedule] = useState<Record<string, string[]>>({});
+  const [specialDates, setSpecialDates] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load initial data
+  const loadData = useCallback(async () => {
+    try {
+      console.log('🔄 Loading schedule data from IndexedDB...');
+      setIsLoading(true);
+      setError(null);
+      
+      await workScheduleDB.init();
+      
+      const [scheduleData, specialDatesData] = await Promise.all([
+        workScheduleDB.getSchedule(),
+        workScheduleDB.getSpecialDates()
+      ]);
+      
+      console.log('📦 Retrieved schedule data:', {
+        scheduleEntries: Object.keys(scheduleData).length,
+        specialDatesEntries: Object.keys(specialDatesData).length
+      });
+      
+      setSchedule(scheduleData);
+      setSpecialDates(specialDatesData);
+      console.log('✅ Schedule data loaded successfully');
+    } catch (err) {
+      console.error('❌ Error loading schedule data:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const updateSchedule = useCallback(async (newSchedule: Record<string, string[]> | ((prev: Record<string, string[]>) => Record<string, string[]>)) => {
+    let scheduleToStore: Record<string, string[]> = schedule; // Initialize with current value
+    
+    try {
+      setError(null);
+      scheduleToStore = typeof newSchedule === 'function' 
+        ? newSchedule(schedule) 
+        : newSchedule;
+      
+      console.log('💾 Saving schedule data:', {
+        entries: Object.keys(scheduleToStore).length
+      });
+      setSchedule(scheduleToStore);
+      
+      // Ensure database is initialized
+      await workScheduleDB.init();
+      await workScheduleDB.setSchedule(scheduleToStore);
+      console.log('✅ Schedule data saved successfully');
+      
+      // Enhanced delay for Android/iPhone persistence
+      // Modern Android devices have aggressive power management that can interrupt transactions
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
+      
+    } catch (err) {
+      console.error('❌ Error saving schedule:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      
+      // Retry logic for iPhone
+      if (err instanceof Error && err.message.includes('Transaction')) {
+        console.log('🔄 Retrying schedule save...');
+        try {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await workScheduleDB.setSchedule(scheduleToStore);
+          console.log('✅ Schedule retry successful');
+          setError(null);
+        } catch (retryErr) {
+          console.error('❌ Schedule retry failed:', retryErr);
+        }
+      }
+    }
+  }, [schedule]);
+
+  const updateSpecialDates = useCallback(async (newSpecialDates: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => {
+    try {
+      setError(null);
+      const specialDatesToStore = typeof newSpecialDates === 'function' 
+        ? newSpecialDates(specialDates) 
+        : newSpecialDates;
+      
+      console.log('💾 Saving special dates data:', {
+        entries: Object.keys(specialDatesToStore).length
+      });
+      setSpecialDates(specialDatesToStore);
+      
+      // Ensure database is initialized
+      await workScheduleDB.init();
+      await workScheduleDB.setSpecialDates(specialDatesToStore);
+      console.log('✅ Special dates data saved successfully');
+      
+      // Enhanced delay for Android/iPhone persistence
+      // Modern Android devices have aggressive power management that can interrupt transactions
+      await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 100ms to 300ms
+      
+    } catch (err) {
+      console.error('❌ Error saving special dates:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      
+      // Retry logic for iPhone
+      if (err instanceof Error && err.message.includes('Transaction')) {
+        console.log('🔄 Retrying special dates save...');
+        try {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await workScheduleDB.setSpecialDates(specialDatesToStore);
+          console.log('✅ Special dates retry successful');
+          setError(null);
+        } catch (retryErr) {
+          console.error('❌ Special dates retry failed:', retryErr);
+        }
+      }
+    }
+  }, [specialDates]);
+
+  return {
+    schedule,
+    specialDates,
+    setSchedule: updateSchedule,
+    setSpecialDates: updateSpecialDates,
+    isLoading,
+    error,
+    refreshData: loadData // Export the refresh function
+  };
+}
