@@ -110,38 +110,38 @@ const AuthenticatedApp: React.FC<{ user: UserSession, onLoginSuccess: (sess: { u
     setRefreshKey(prev => prev + 1); // Force refresh calculations
   };
   
-  // Force save on page close/refresh for Android reliability
-  useEffect(() => {
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
-      // Skip prompt if logging out intentionally
-      if ((window as any)._skipUnloadPrompt) return;
-      
-      // Modern browsers ignore custom messages but still trigger the event
-      e.preventDefault();
-      
-      // Synchronously save critical data before unload
-      try {
-        console.log('💾 Force saving data before unload...');
-        await workScheduleDB.init();
-        await Promise.all([
-          workScheduleDB.setSchedule(schedule),
-          workScheduleDB.setSpecialDates(specialDates)
-        ]);
-        console.log('✅ Data saved successfully before unload');
-      } catch (error) {
-        console.error('❌ Error saving before unload:', error);
-      }
-      
-      // Required for Chrome to show unload dialog
-      e.returnValue = '';
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [schedule, specialDates]);
+  // Force save on page close/refresh for Android reliability - DISABLED to prevent annoying prompt
+  // useEffect(() => {
+  //   const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+  //     // Skip prompt if logging out intentionally
+  //     if ((window as any)._skipUnloadPrompt) return;
+  //     
+  //     // Modern browsers ignore custom messages but still trigger the event
+  //     e.preventDefault();
+  //     
+  //     // Synchronously save critical data before unload
+  //     try {
+  //       console.log('💾 Force saving data before unload...');
+  //       await workScheduleDB.init();
+  //       await Promise.all([
+  //         workScheduleDB.setSchedule(schedule),
+  //         workScheduleDB.setSpecialDates(specialDates)
+  //       ]);
+  //       console.log('✅ Data saved successfully before unload');
+  //     } catch (error) {
+  //       console.error('❌ Error saving before unload:', error);
+  //     }
+  //     
+  //     // Required for Chrome to show unload dialog
+  //     e.returnValue = '';
+  //   };
+  //   
+  //   window.addEventListener('beforeunload', handleBeforeUnload);
+  //   
+  //   return () => {
+  //     window.removeEventListener('beforeunload', handleBeforeUnload);
+  //   };
+  // }, [schedule, specialDates]);
   
   // Get current month and year for salary lookup
   const currentMonth = currentDate.getMonth();
