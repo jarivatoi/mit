@@ -371,7 +371,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ onLoginSuccess, onRegister, sho
       
       if (rec.error || !rec.data) throw new Error('User not found')
       const row = rec.data
-      if (!row.is_active) throw new Error('User is inactive')
+      if (!row.is_active) throw new Error('Access Denied')
       
       const hashed = await hash(passcode)
       console.log('Login attempt:', { passcode, hashed, storedHash: row.passcode_hash });
