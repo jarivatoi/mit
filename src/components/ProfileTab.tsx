@@ -191,7 +191,7 @@ const ProfileTab: React.FC<ProfileProps> = ({ user, onLoginSuccess }) => {
       const rec = await supabase.from('staff_users').select('id, surname, name, id_number, passcode_hash, is_admin, is_active').eq('id_number', idNumber).single()
       if (rec.error || !rec.data) throw new Error('User not found')
       const row = rec.data
-      if (!row.is_active) throw new Error('Access Denied')
+      if (!row.is_active) throw new Error('User is inactive')
       const hashed = await hash(passcode)
       if (hashed !== row.passcode_hash) throw new Error('Incorrect passcode')
       await supabase.from('staff_users').update({ last_login: new Date().toISOString() }).eq('id', row.id)
