@@ -30,16 +30,6 @@ const AdminPanel: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [staffToDelete, setStaffToDelete] = useState<{id: string, name: string} | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-
-  // Filter staff based on search query
-  const filteredStaff = staff.filter(s => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    const name = `${s.name} ${s.surname}`.toLowerCase();
-    const idNumber = s.id_number?.toLowerCase() || '';
-    return name.includes(query) || idNumber.includes(query);
-  });
 
   const fetchData = async () => {
     setLoading(true)
@@ -239,26 +229,7 @@ const AdminPanel: React.FC = () => {
           textAlign: 'center',
           display: 'block',
           width: '100%'
-        }}>Staff Directory ({filteredStaff.length})</strong>
-        
-        {/* Search Filter */}
-        <div style={{ marginBottom: 8 }}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter by ID or name..."
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '13px',
-              outline: 'none',
-              boxSizing: 'border-box'
-            }}
-          />
-        </div>
+        }}>Staff Directory</strong>
         {loading ? (
           <div style={{ 
             padding: 24, 
@@ -291,7 +262,7 @@ const AdminPanel: React.FC = () => {
             WebkitOverflowScrolling: 'touch',
             touchAction: 'pan-y'
           }}>
-            {filteredStaff.map(s => (
+            {staff.map(s => (
               <li key={s.id} style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 
@@ -371,16 +342,6 @@ const AdminPanel: React.FC = () => {
                 </div>
               </li>
             ))}
-          {filteredStaff.length === 0 && searchQuery.trim() && (
-            <li style={{
-              padding: '24px 16px',
-              textAlign: 'center',
-              color: '#6b7280',
-              fontSize: '14px'
-            }}>
-              No staff found matching "{searchQuery}"
-            </li>
-          )}
           </ul>
         )}
       </div>
